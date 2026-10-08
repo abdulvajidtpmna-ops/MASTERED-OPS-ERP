@@ -346,7 +346,7 @@ export function AdmissionsPage() {
             ]}
             data={admissions}
             searchPlaceholder="Search student name, admission no, or mobile..."
-            exportFileName="MLC_Admissions_List.csv"
+            exportFileName="MASTERED_Admissions_List.csv"
             pageSize={10}
             emptyTitle="No Admissions Registered"
             emptyMessage="Click 'Register Admission' above to enroll the first candidate."

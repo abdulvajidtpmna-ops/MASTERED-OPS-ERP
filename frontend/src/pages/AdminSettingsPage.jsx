@@ -156,7 +156,7 @@ export function AdminSettingsPage() {
             columns={userCols}
             data={users}
             searchPlaceholder="Search users by name, email, or role..."
-            exportFileName="MLC_Users_List.csv"
+            exportFileName="MASTERED_Users_List.csv"
             pageSize={10}
           />
         </Card>
@@ -296,7 +296,7 @@ Joining Date: {{JOINING_DATE}}`}
             columns={logCols}
             data={auditLogs}
             searchPlaceholder="Search audit actions, entities, or actors..."
-            exportFileName="MLC_System_Audit_Log.csv"
+            exportFileName="MASTERED_System_Audit_Log.csv"
             pageSize={10}
           />
         </Card>

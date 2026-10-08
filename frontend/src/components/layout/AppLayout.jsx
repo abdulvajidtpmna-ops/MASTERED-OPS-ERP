@@ -14,10 +14,14 @@ export function AppLayout() {
     return (
       <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gold-shine flex items-center justify-center font-poppins font-black text-brand-900 text-xl shadow-gold-glow animate-pulse">
-            M
+          <div className="w-14 h-14 rounded-2xl bg-brand-900 border border-brand-500/30 p-2 flex items-center justify-center shadow-gold-glow animate-pulse">
+            <img
+              src="/logo-white-transparent.png"
+              alt="MASTERED OPS ERP"
+              className="w-full h-full object-contain"
+            />
           </div>
-          <p className="text-sm font-semibold text-brand-900">Loading MLC ERP...</p>
+          <p className="text-sm font-semibold text-brand-900 font-poppins">Loading MASTERED OPS ERP...</p>
         </div>
       </div>
     );

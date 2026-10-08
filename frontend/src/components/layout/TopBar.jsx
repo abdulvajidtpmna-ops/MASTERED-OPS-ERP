@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { InstallAppModal } from '../common/InstallAppModal';
 import {
   Menu,
   Bell,
   Search,
   Sparkles,
   ShieldCheck,
+  Download,
   X,
 } from 'lucide-react';
 
 export function TopBar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
   const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, title: 'Interview Scheduled', msg: 'Rahul Krishnan shortlisted for Aster DM Healthcare.', time: '10m ago', unread: true },
     { id: 2, title: 'Fee Postponement Request', msg: 'Sneha Mohan requested postponement to Feb 28.', time: '1h ago', unread: true },
@@ -33,26 +36,27 @@ export function TopBar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200/80 shadow-sm sticky top-0 z-20 px-3 sm:px-6 flex items-center justify-between gap-3">
-      {/* Left: Menu toggle & Brand Title */}
-      <div className="flex items-center gap-2.5">
-        <button
-          type="button"
-          onClick={handleMenuClick}
-          aria-label="Open Navigation Menu"
-          className="p-2.5 rounded-xl bg-brand-50 text-brand-900 hover:bg-brand-100 transition-colors flex items-center justify-center border border-brand-200/60 shadow-sm active:scale-95"
-        >
-          <Menu className="w-5 h-5 text-brand-900" />
-        </button>
-        <div className="block">
-          <span className="text-[10px] sm:text-xs font-semibold text-gold-600 tracking-wider uppercase block leading-none">
-            Mastered Academy
-          </span>
-          <h2 className="text-xs sm:text-sm font-poppins font-bold text-brand-900 leading-tight truncate max-w-[180px] sm:max-w-none">
-            MLC ERP Operations
-          </h2>
+    <>
+      <header className="h-16 bg-white border-b border-gray-200/80 shadow-sm sticky top-0 z-20 px-3 sm:px-6 flex items-center justify-between gap-3">
+        {/* Left: Menu toggle & Brand Title */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleMenuClick}
+            aria-label="Open Navigation Menu"
+            className="p-2.5 rounded-xl bg-brand-50 text-brand-900 hover:bg-brand-100 transition-colors flex items-center justify-center border border-brand-200/60 shadow-sm active:scale-95"
+          >
+            <Menu className="w-5 h-5 text-brand-900" />
+          </button>
+          <div className="block">
+            <span className="text-[10px] sm:text-xs font-semibold text-gold-600 tracking-wider uppercase block leading-none">
+              Mastered Skill Academy
+            </span>
+            <h2 className="text-xs sm:text-sm font-poppins font-bold text-brand-900 leading-tight truncate max-w-[180px] sm:max-w-none">
+              MASTERED OPS ERP
+            </h2>
+          </div>
         </div>
-      </div>
 
       {/* Center: Quick Global Search Bar */}
       <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
@@ -113,6 +117,17 @@ export function TopBar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
           )}
         </div>
 
+        {/* Install App / APK Button */}
+        <button
+          type="button"
+          onClick={() => setShowInstallModal(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-brand-900 to-brand-700 text-gold-300 hover:text-white rounded-xl text-xs font-bold shadow-sm hover:shadow transition-all border border-brand-500/30 active:scale-95"
+          title="Install MASTERED OPS ERP App / APK"
+        >
+          <Download className="w-3.5 h-3.5 text-gold-400" />
+          <span className="hidden sm:inline">Install App</span>
+        </button>
+
         {/* Profile Avatar */}
         <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-gray-200">
           <div className="w-8 h-8 rounded-xl bg-blue-shine text-white font-bold flex items-center justify-center text-xs shadow-sm">
@@ -125,5 +140,11 @@ export function TopBar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
         </div>
       </div>
     </header>
+
+    <InstallAppModal
+      isOpen={showInstallModal}
+      onClose={() => setShowInstallModal(false)}
+    />
+  </>
   );
 }

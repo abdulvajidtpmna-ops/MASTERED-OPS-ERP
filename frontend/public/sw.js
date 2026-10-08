@@ -1,8 +1,15 @@
-const CACHE_NAME = 'mlc-erp-v1';
+const CACHE_NAME = 'mastered-ops-erp-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/logo-white-transparent.png',
+  '/logo-blue-transparent.png',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png',
+  '/apple-touch-icon.png',
+  '/favicon-32x32.png',
+  '/favicon-64x64.png'
 ];
 
 self.addEventListener('install', (event) => {

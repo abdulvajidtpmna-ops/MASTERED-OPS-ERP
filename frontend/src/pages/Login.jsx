@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Button } from '../components/common/Button';
-import { ShieldCheck, GraduationCap, Users, Sparkles, Lock, Mail, Phone } from 'lucide-react';
+import { ShieldCheck, GraduationCap, Users, Sparkles, Lock, Mail, Phone, Download } from 'lucide-react';
+import { InstallAppModal } from '../components/common/InstallAppModal';
 
 export function Login() {
   const [activeTab, setActiveTab] = useState('STAFF'); // STAFF | TRAINER | STUDENT
   const [identifier, setIdentifier] = useState('');
   const [secret, setSecret] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   const { login, switchDemoRole } = useAuth();
   const toast = useToast();
@@ -65,14 +67,18 @@ export function Login() {
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md z-10 text-center">
         {/* Brand Icon Header */}
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-900 via-brand-700 to-brand-500 flex items-center justify-center font-poppins font-black text-2xl text-gold-400 shadow-xl border border-gold-400/40">
-          M
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-900 via-brand-700 to-brand-500 p-2.5 flex items-center justify-center shadow-xl border border-gold-400/40">
+          <img
+            src="/logo-white-transparent.png"
+            alt="MASTERED OPS ERP"
+            className="w-full h-full object-contain"
+          />
         </div>
         <h1 className="mt-4 text-2xl font-poppins font-bold text-brand-900 tracking-tight">
-          MLC ERP Platform
+          MASTERED OPS ERP
         </h1>
         <p className="mt-1 text-xs font-semibold text-gold-600 tracking-wider uppercase">
-          Mastered Language Coach / Mastered Skill Academy
+          Mastered Skill Academy
         </p>
       </div>
 
@@ -246,8 +252,26 @@ export function Login() {
               </button>
             </div>
           </div>
+
+          {/* Install App / APK Option */}
+          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+            <span className="text-[11px] text-gray-500 font-medium">Use on Mobile / Tablet / PC?</span>
+            <button
+              type="button"
+              onClick={() => setShowInstallModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-900 border border-brand-200 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+            >
+              <Download className="w-3.5 h-3.5 text-gold-600" />
+              <span>Install App / APK</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      <InstallAppModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+      />
     </div>
   );
 }

@@ -1,21 +1,39 @@
 {
-  "name": "MLC ERP — Mastered Skill Academy",
-  "short_name": "MLC ERP",
-  "description": "Operations, Academics & Placement Management Platform for Mastered Language Coach / Mastered Skill Academy",
+  "name": "MASTERED OPS ERP",
+  "short_name": "Mastered Ops",
+  "description": "Official Operations, Timetable, Academics & Admissions ERP for Mastered Skill Academy",
   "start_url": "/",
+  "id": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#061B4D",
   "theme_color": "#061B4D",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/pwa-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/pwa-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "categories": ["education", "productivity", "business"]
 }

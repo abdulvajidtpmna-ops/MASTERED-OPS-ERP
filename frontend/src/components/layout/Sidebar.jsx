@@ -55,13 +55,17 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) 
         {/* Brand Header */}
         <div className="h-16 flex items-center px-4 bg-gradient-to-r from-brand-900 to-brand-700 border-b border-brand-700/60 justify-between">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-xl bg-gold-shine flex items-center justify-center font-poppins font-black text-brand-900 shadow-gold-glow shrink-0">
-              M
+            <div className="w-10 h-10 rounded-xl bg-brand-800/80 border border-brand-500/30 p-1 flex items-center justify-center shrink-0 shadow-soft-blue">
+              <img
+                src="/logo-white-transparent.png"
+                alt="MASTERED OPS ERP"
+                className="w-full h-full object-contain"
+              />
             </div>
             {(!collapsed || isMobileView) && (
               <div className="leading-tight truncate">
-                <h1 className="font-poppins font-bold text-sm tracking-wide text-white">MLC ERP</h1>
-                <p className="text-[10px] text-gold-400 font-semibold tracking-wider uppercase">Mastered Academy</p>
+                <h1 className="font-poppins font-bold text-sm tracking-wide text-white">MASTERED OPS ERP</h1>
+                <p className="text-[10px] text-gold-400 font-semibold tracking-wider uppercase">Mastered Skill Academy</p>
               </div>
             )}
           </div>
