@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
+import { AutoUpdater } from './components/common/AutoUpdater';
 
 // Pages
 import { Login } from './pages/Login';
@@ -57,8 +58,9 @@ export function App() {
   };
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
 
       <Route element={<AppLayout />}>
         <Route index element={<Navigate to={getDefaultRedirect()} replace />} />
@@ -206,5 +208,7 @@ export function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    <AutoUpdater />
+    </>
   );
 }
