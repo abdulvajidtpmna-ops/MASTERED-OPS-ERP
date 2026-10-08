@@ -27,16 +27,16 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) 
   // Navigation links filtered by role
   const navItems = [
     { to: '/dashboard/main', label: 'Main Dashboard', icon: LayoutDashboard, roles: ['MAIN_ADMIN'] },
-    { to: '/dashboard/ops', label: 'Operations Dashboard', icon: LayoutDashboard, roles: ['OPS_ADMIN'] },
-    { to: '/admissions', label: 'Admissions & Sales', icon: Users, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN'] },
+    { to: '/dashboard/ops', label: 'Operations Dashboard', icon: LayoutDashboard, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC'] },
+    { to: '/admissions', label: 'Admissions & Sales', icon: Users, roles: ['OPS_ADMIN', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN'] },
     { to: '/after-sales', label: 'After-Sales & Assign', icon: PhoneCall, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC'] },
     { to: '/batches', label: 'Batches & Timetable', icon: CalendarDays, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC', 'OFFICE_ADMIN'] },
     { to: '/fees', label: 'Fee Collection', icon: IndianRupee, roles: ['MAIN_ADMIN', 'OFFICE_ADMIN', 'OPS_ADMIN'] },
-    { to: '/agreements', label: 'Agreements & Desk', icon: FileCheck2, roles: ['MAIN_ADMIN', 'OFFICE_ADMIN', 'OPS_ADMIN'] },
+    { to: '/agreements', label: 'Agreements & Desk', icon: FileCheck2, roles: ['OFFICE_ADMIN', 'OPS_ADMIN'] },
     { to: '/placement', label: 'Placement Tracker', icon: Briefcase, roles: ['MAIN_ADMIN', 'PLACEMENT_ADMIN'] },
-    { to: '/trainer', label: 'Trainer Console', icon: GraduationCap, roles: ['MAIN_ADMIN', 'TRAINER'] },
+    { to: '/trainer', label: 'Trainer Console', icon: GraduationCap, roles: ['TRAINER'] },
     { to: '/student', label: 'Student Portal', icon: GraduationCap, roles: ['STUDENT'] },
-    { to: '/duties', label: 'My Duties & KPI', icon: ListTodo, roles: ['MAIN_ADMIN', 'HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC', 'PLACEMENT_ADMIN'] },
+    { to: '/duties', label: 'My Duties & KPI', icon: ListTodo, roles: ['HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC', 'PLACEMENT_ADMIN'] },
     { to: '/hr-review', label: 'HR Performance Review', icon: UserCheck, roles: ['MAIN_ADMIN', 'HR', 'DEPT_HEAD'] },
     { to: '/settings', label: 'Admin Settings', icon: Settings, roles: ['MAIN_ADMIN'] },
   ];

@@ -228,16 +228,54 @@ function executeMockAction(action, payload, token) {
         batch_id: payload.batch_id,
         module_code: payload.module_code,
         date: payload.date,
-        start_time: payload.start_time,
-        end_time: payload.end_time,
+        start_time: payload.start_time || '10:00',
+        end_time: payload.end_time || '12:00',
         hours: Number(payload.hours) || 2,
         audience: payload.audience || 'ALL',
-        status: 'PLANNED',
+        status: payload.status || 'PLANNED',
         topics_covered_note: payload.topics_covered_note || ''
       };
       db.sessions.push(session);
       saveMockDb(db);
       return session;
+    }
+
+    case 'bulkSaveDailyTimetable': {
+      const { date, entries } = payload;
+      const saved = [];
+      (entries || []).forEach(e => {
+        if (e.is_active === false) return;
+        let s = db.sessions.find(item => item.batch_id === e.batch_id && item.date === date);
+        if (s) {
+          s.module_code = e.module_code || 'M01';
+          s.trainer_id = e.trainer_id || 'TR-101';
+          s.start_time = e.start_time || '10:00';
+          s.end_time = e.end_time || '12:00';
+          s.hours = Number(e.hours) || 2;
+          s.audience = e.audience || 'ALL';
+          s.topics_covered_note = e.topics_covered_note || '';
+          saved.push(s);
+        } else {
+          const newSess = {
+            id: 'ses-' + Date.now() + Math.random().toString(36).substring(2, 5),
+            session_id: 'SES-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+            batch_id: e.batch_id,
+            module_code: e.module_code || 'M01',
+            trainer_id: e.trainer_id || 'TR-101',
+            date: date,
+            start_time: e.start_time || '10:00',
+            end_time: e.end_time || '12:00',
+            hours: Number(e.hours) || 2,
+            audience: e.audience || 'ALL',
+            status: 'PLANNED',
+            topics_covered_note: e.topics_covered_note || ''
+          };
+          db.sessions.push(newSess);
+          saved.push(newSess);
+        }
+      });
+      saveMockDb(db);
+      return { count: saved.length, date, items: saved };
     }
 
     case 'getBatchesList': {
@@ -329,6 +367,56 @@ function executeMockAction(action, payload, token) {
         overall_shortfall_hours: overallShortfall,
         is_eligible: overallPct >= 85 && allPass85,
         modules: modulesList
+      };
+    }
+
+    case 'getAttendanceOverview': {
+      const allStudents = db.students.filter(s => s.status !== 'DROPPED');
+      const allBatches = db.batches;
+      const allSessions = db.sessions;
+      const allAtt = db.attendance;
+
+      const batchStats = allBatches.map(b => {
+        const bStudents = allStudents.filter(s => s.batch_id === b.id);
+        const bSessions = allSessions.filter(s => s.batch_id === b.id && s.status === 'DONE');
+        const totalPossibilities = bStudents.length * (bSessions.length || 1);
+        let presentCount = 0;
+        let eligibleCount = 0;
+
+        bStudents.forEach(st => {
+          const stAtt = allAtt.filter(a => a.student_id === st.student_id && (a.status === 'P' || a.status === 'L' || a.status === 'EXCUSED'));
+          presentCount += stAtt.length;
+          const pct = bSessions.length > 0 ? (stAtt.length / bSessions.length) * 100 : 100;
+          if (pct >= 85) eligibleCount++;
+        });
+
+        const batchPct = bSessions.length > 0 ? Number(((presentCount / totalPossibilities) * 100).toFixed(1)) : 94.5;
+
+        return {
+          batch_id: b.id,
+          batch_code: b.batch_code,
+          name: b.name,
+          status: b.status,
+          total_students: bStudents.length,
+          conducted_sessions: bSessions.length,
+          average_attendance_pct: batchPct,
+          eligible_students: eligibleCount,
+          low_attendance_count: Math.max(0, bStudents.length - eligibleCount)
+        };
+      });
+
+      const totalEnrolled = allStudents.length;
+      const totalEligible = batchStats.reduce((sum, b) => sum + b.eligible_students, 0);
+
+      return {
+        overall_institute_pct: 92.4,
+        total_enrolled: totalEnrolled,
+        total_eligible: totalEligible || 2,
+        eligible_percentage: totalEnrolled > 0 ? Number(((totalEligible / totalEnrolled) * 100).toFixed(1)) : 88.0,
+        today_present_count: 24,
+        today_absent_count: 2,
+        today_late_count: 1,
+        batches: batchStats
       };
     }
 
@@ -599,20 +687,62 @@ function executeMockAction(action, payload, token) {
     }
 
     case 'saveNote': {
+      let existingNote = payload.id ? db.notes.find(n => n.id === payload.id) : null;
+      if (existingNote) {
+        existingNote.module_code = payload.module_code;
+        existingNote.title = payload.title;
+        existingNote.file_type = payload.file_type || 'PDF';
+        existingNote.file_url = payload.file_url;
+        existingNote.description = payload.description || '';
+        existingNote.assigned_trainer_id = payload.assigned_trainer_id || '';
+        existingNote.updated_at = new Date().toISOString();
+        if (payload.batch_id) {
+          const existAssign = db.noteAssignments.find(a => a.note_id === existingNote.id && a.batch_id === payload.batch_id);
+          if (!existAssign) {
+            db.noteAssignments.push({ id: 'na-' + Date.now(), note_id: existingNote.id, batch_id: payload.batch_id, assigned_at: new Date().toISOString() });
+          }
+        }
+        saveMockDb(db);
+        return existingNote;
+      }
+
       const newNote = {
         id: 'not-' + Date.now(),
         module_code: payload.module_code,
         title: payload.title,
         file_type: payload.file_type || 'PDF',
         file_url: payload.file_url,
-        is_active: true
+        description: payload.description || '',
+        assigned_trainer_id: payload.assigned_trainer_id || 'TR-101',
+        is_active: true,
+        created_at: new Date().toISOString()
       };
       db.notes.push(newNote);
+
+      if (payload.batch_id) {
+        db.noteAssignments.push({
+          id: 'na-' + Date.now(),
+          note_id: newNote.id,
+          batch_id: payload.batch_id,
+          assigned_at: new Date().toISOString()
+        });
+      }
+
       saveMockDb(db);
       return newNote;
     }
 
+    case 'deleteNote': {
+      const noteId = payload.note_id || payload.id;
+      db.notes = db.notes.filter(n => n.id !== noteId);
+      db.noteAssignments = db.noteAssignments.filter(a => a.note_id !== noteId);
+      saveMockDb(db);
+      return { note_id: noteId, deleted: true };
+    }
+
     case 'assignNoteToBatch': {
+      const exist = db.noteAssignments.find(a => a.note_id === payload.note_id && a.batch_id === payload.batch_id);
+      if (exist) return exist;
       const assign = {
         id: 'na-' + Date.now(),
         note_id: payload.note_id,

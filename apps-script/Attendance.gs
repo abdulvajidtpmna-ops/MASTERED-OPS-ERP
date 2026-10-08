@@ -230,3 +230,65 @@ function getAttendanceSummary(studentId) {
     }
   };
 }
+
+/**
+ * 3. Get Institute-wide & Batch-wise Attendance Overview (MAIN_ADMIN / OPS_ADMIN / OPS_EXEC)
+ */
+function getAttendanceOverview(currentUser) {
+  requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC']);
+
+  var allStudents = getTableData('Students').filter(function(s) { return s.status !== 'DROPPED'; });
+  var allBatches = getTableData('Batches');
+  var allSessions = getTableData('ClassSessions');
+  var allAttendance = getTableData('Attendance');
+
+  var batchStats = allBatches.map(function(b) {
+    var bStudents = allStudents.filter(function(s) { return s.batch_id === b.id; });
+    var bSessions = allSessions.filter(function(s) { return s.batch_id === b.id && s.status === 'DONE'; });
+
+    var totalPossibilities = bStudents.length * bSessions.length;
+    var presentCount = 0;
+    var eligibleCount = 0;
+
+    bStudents.forEach(function(st) {
+      var stAtt = allAttendance.filter(function(a) {
+        return a.student_id === st.student_id && (a.status === 'P' || a.status === 'L' || a.status === 'EXCUSED');
+      });
+      presentCount += stAtt.length;
+      var stPct = bSessions.length > 0 ? (stAtt.length / bSessions.length) * 100 : 100;
+      if (stPct >= 85) eligibleCount++;
+    });
+
+    var batchPct = totalPossibilities > 0 ? Number(((presentCount / totalPossibilities) * 100).toFixed(1)) : 100;
+
+    return {
+      batch_id: b.id,
+      batch_code: b.batch_code,
+      name: b.name,
+      status: b.status,
+      total_students: bStudents.length,
+      conducted_sessions: bSessions.length,
+      average_attendance_pct: batchPct,
+      eligible_students: eligibleCount,
+      low_attendance_count: bStudents.length - eligibleCount
+    };
+  });
+
+  var totalEnrolled = allStudents.length;
+  var totalEligible = batchStats.reduce(function(sum, b) { return sum + b.eligible_students; }, 0);
+  var overallInstitutePct = batchStats.length > 0
+    ? Number((batchStats.reduce(function(sum, b) { return sum + b.average_attendance_pct; }, 0) / batchStats.length).toFixed(1))
+    : 90.0;
+
+  return {
+    ok: true,
+    data: {
+      overall_institute_pct: overallInstitutePct,
+      total_enrolled: totalEnrolled,
+      total_eligible: totalEligible,
+      eligible_percentage: totalEnrolled > 0 ? Number(((totalEligible / totalEnrolled) * 100).toFixed(1)) : 85.0,
+      batches: batchStats
+    }
+  };
+}
+

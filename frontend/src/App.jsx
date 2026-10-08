@@ -31,7 +31,7 @@ function RoleRoute({ allowedRoles, children }) {
 
   if (!allowedRoles.includes(user.role)) {
     // Redirect to default home for their role
-    if (user.role === 'OPS_ADMIN') return <Navigate to="/dashboard/ops" replace />;
+    if (user.role === 'OPS_ADMIN' || user.role === 'OPS_EXEC') return <Navigate to="/dashboard/ops" replace />;
     if (user.role === 'TRAINER') return <Navigate to="/trainer" replace />;
     if (user.role === 'STUDENT') return <Navigate to="/student" replace />;
     if (user.role === 'PLACEMENT_ADMIN') return <Navigate to="/placement" replace />;
@@ -49,7 +49,7 @@ export function App() {
   const getDefaultRedirect = () => {
     if (!user) return '/login';
     if (user.role === 'MAIN_ADMIN') return '/dashboard/main';
-    if (user.role === 'OPS_ADMIN') return '/dashboard/ops';
+    if (user.role === 'OPS_ADMIN' || user.role === 'OPS_EXEC') return '/dashboard/ops';
     if (user.role === 'TRAINER') return '/trainer';
     if (user.role === 'STUDENT') return '/student';
     if (user.role === 'PLACEMENT_ADMIN') return '/placement';
@@ -79,7 +79,7 @@ export function App() {
         <Route
           path="/dashboard/ops"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN', 'OPS_ADMIN']}>
+            <RoleRoute allowedRoles={['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC']}>
               <OpsAdminDashboard />
             </RoleRoute>
           }
@@ -89,7 +89,7 @@ export function App() {
         <Route
           path="/admissions"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN', 'OPS_ADMIN', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN']}>
+            <RoleRoute allowedRoles={['OPS_ADMIN', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN']}>
               <AdmissionsPage />
             </RoleRoute>
           }
@@ -129,7 +129,7 @@ export function App() {
         <Route
           path="/agreements"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN', 'OFFICE_ADMIN', 'OPS_ADMIN']}>
+            <RoleRoute allowedRoles={['OFFICE_ADMIN', 'OPS_ADMIN']}>
               <AgreementsPage />
             </RoleRoute>
           }
@@ -149,7 +149,7 @@ export function App() {
         <Route
           path="/trainer"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN', 'TRAINER']}>
+            <RoleRoute allowedRoles={['TRAINER']}>
               <TrainerConsolePage />
             </RoleRoute>
           }
@@ -159,7 +159,7 @@ export function App() {
         <Route
           path="/student"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN', 'STUDENT']}>
+            <RoleRoute allowedRoles={['STUDENT']}>
               <StudentPortalPage />
             </RoleRoute>
           }
@@ -169,7 +169,7 @@ export function App() {
         <Route
           path="/duties"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN', 'HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC', 'PLACEMENT_ADMIN']}>
+            <RoleRoute allowedRoles={['HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC', 'PLACEMENT_ADMIN']}>
               <DutiesPage />
             </RoleRoute>
           }

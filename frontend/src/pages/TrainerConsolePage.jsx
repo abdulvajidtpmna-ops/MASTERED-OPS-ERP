@@ -30,6 +30,8 @@ export function TrainerConsolePage() {
   const [students, setStudents] = useState([]);
   const [attendanceRows, setAttendanceRows] = useState({});
   const [topicsCoveredNote, setTopicsCoveredNote] = useState('');
+  const [notesList, setNotesList] = useState([]);
+  const [noteAssignments, setNoteAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,13 +49,16 @@ export function TrainerConsolePage() {
   const loadTrainerData = async () => {
     try {
       setLoading(true);
-      const [batchList, admList] = await Promise.all([
+      const [batchList, admList, notesData] = await Promise.all([
         apiCall('getBatchesList'),
         apiCall('getAdmissions'),
+        apiCall('getAccessibleNotes'),
       ]);
 
       const bList = batchList || [];
       setBatches(bList);
+      setNotesList(notesData?.notes || []);
+      setNoteAssignments(notesData?.assignments || []);
 
       const targetBatchId = selectedBatchId || (bList.length ? bList[0].id : '');
       if (!selectedBatchId && targetBatchId) {
@@ -491,34 +496,57 @@ export function TrainerConsolePage() {
 
       {/* 3. NOTES ASSIGNMENT */}
       {activeTab === 'NOTES' && (
-        <Card title={`Assign Study Materials to: ${activeBatch?.name || 'Cohort'}`} subtitle="Students see only assigned/completed module notes">
+        <Card title={`Assign Study Materials to: ${activeBatch?.name || 'Cohort'}`} subtitle="Students in this batch will immediately see and download assigned Doc & PDF notes">
           <div className="space-y-3">
-            {[
-              { id: 'not-1', code: 'M01', title: 'Future Career Foundation Comprehensive Guidebook', file: 'PDF (3.4 MB)', assigned: true },
-              { id: 'not-2', code: 'M02', title: 'Gen AI Business Workflows & Prompt Engineering Cheatsheet', file: 'PDF (5.1 MB)', assigned: true },
-              { id: 'not-3', code: 'M03', title: 'Corporate SOPs & CXO Secretary Handbook', file: 'PDF (4.8 MB)', assigned: false },
-            ].map((n) => (
-              <div key={n.id} className="p-4 rounded-xl border border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-6 h-6 text-brand-700 shrink-0" />
-                  <div>
-                    <span className="font-mono text-xs font-bold text-brand-500">{n.code}</span>
-                    <h5 className="font-semibold text-xs text-brand-900">{n.title}</h5>
-                    <p className="text-[11px] text-gray-500">{n.file}</p>
+            {notesList.map((n) => {
+              const isAssigned = noteAssignments.some(
+                (a) => a.note_id === n.id && a.batch_id === selectedBatchId
+              );
+
+              return (
+                <div key={n.id} className="p-4 rounded-xl border border-gray-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-brand-300 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-6 h-6 text-brand-700 shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-brand-500">{n.module_code}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded border">
+                          {n.file_type || 'PDF'}
+                        </span>
+                      </div>
+                      <h5 className="font-semibold text-xs text-brand-900 mt-0.5">{n.title}</h5>
+                      {n.description && <p className="text-[11px] text-gray-500 mt-0.5">{n.description}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <a
+                      href={n.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    >
+                      View Link
+                    </a>
+                    <Button
+                      variant={isAssigned ? 'secondary' : 'primary'}
+                      size="sm"
+                      onClick={async () => {
+                        await apiCall('assignNoteToBatch', { note_id: n.id, batch_id: selectedBatchId });
+                        toast.success(`Note assigned to batch ${activeBatch?.batch_code}!`);
+                        loadTrainerData();
+                      }}
+                    >
+                      {isAssigned ? '✓ Assigned' : 'Assign to Batch'}
+                    </Button>
                   </div>
                 </div>
-                <Button
-                  variant={n.assigned ? 'secondary' : 'primary'}
-                  size="sm"
-                  onClick={() => {
-                    apiCall('assignNoteToBatch', { note_id: n.id, batch_id: selectedBatchId });
-                    toast.success('Note assigned to batch successfully!');
-                  }}
-                >
-                  {n.assigned ? '✓ Assigned' : 'Assign to Batch'}
-                </Button>
-              </div>
-            ))}
+              );
+            })}
+
+            {notesList.length === 0 && (
+              <p className="text-xs text-gray-500 py-6 text-center">No study materials in the library yet.</p>
+            )}
           </div>
         </Card>
       )}

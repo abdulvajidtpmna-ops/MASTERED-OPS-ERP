@@ -86,6 +86,9 @@ function doPost(e) {
       case 'createClassSession':
         result = createClassSession(payload, currentUser);
         break;
+      case 'bulkSaveDailyTimetable':
+        result = bulkSaveDailyTimetable(payload, currentUser);
+        break;
       case 'getBatchesList':
         result = getBatchesList(payload, currentUser);
         break;
@@ -97,6 +100,9 @@ function doPost(e) {
       case 'getAttendanceSummary':
         var targetStudentId = (currentUser.role === 'STUDENT') ? (currentUser.student_id || currentUser.id) : payload.student_id;
         result = getAttendanceSummary(targetStudentId);
+        break;
+      case 'getAttendanceOverview':
+        result = getAttendanceOverview(currentUser);
         break;
 
       // 5. Assessments & Grades
@@ -160,6 +166,9 @@ function doPost(e) {
       // 10. Notes & Study Materials
       case 'saveNote':
         result = saveNote(payload, currentUser);
+        break;
+      case 'deleteNote':
+        result = deleteNote(payload, currentUser);
         break;
       case 'assignNoteToBatch':
         result = assignNoteToBatch(payload, currentUser);

@@ -262,7 +262,7 @@ function startBatch(payload, currentUser) {
  * 4. Create Scheduled Class Session
  */
 function createClassSession(payload, currentUser) {
-  requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'TRAINER']);
+  requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'TRAINER', 'OPS_EXEC']);
 
   var sessionId = 'SES-' + Utilities.getUuid().substring(0, 8).toUpperCase();
   var session = insertRecord('ClassSessions', {
@@ -272,11 +272,11 @@ function createClassSession(payload, currentUser) {
     topic_id: payload.topic_id || '',
     trainer_id: payload.trainer_id || currentUser.trainer_id || '',
     date: payload.date,
-    start_time: payload.start_time,
-    end_time: payload.end_time,
+    start_time: payload.start_time || '10:00',
+    end_time: payload.end_time || '12:00',
     hours: Number(payload.hours) || 2,
     audience: payload.audience || 'ALL', // ALL | BHA_ONLY
-    status: 'PLANNED',
+    status: payload.status || 'PLANNED',
     topics_covered_note: payload.topics_covered_note || ''
   }, currentUser.id);
 
@@ -285,7 +285,7 @@ function createClassSession(payload, currentUser) {
     recipient_user_id: 'BATCH_' + payload.batch_id,
     role_target: 'STUDENT',
     title: 'New Session Scheduled: ' + payload.module_code,
-    message: 'Session scheduled for ' + payload.date + ' at ' + payload.start_time,
+    message: 'Session scheduled for ' + payload.date + ' at ' + (payload.start_time || '10:00'),
     type: 'TIMETABLE_UPDATE',
     is_read: false
   }, currentUser.id);
@@ -296,7 +296,74 @@ function createClassSession(payload, currentUser) {
 }
 
 /**
- * 5. Get Batches & Filter
+ * 5. Bulk Save Daily Timetable for All Active Batches (Tomorrow / Selected Date)
+ * Updates/creates 2-hour daily sessions for all active cohorts with 1-click execution.
+ */
+function bulkSaveDailyTimetable(payload, currentUser) {
+  requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC', 'TRAINER']);
+
+  var date = payload.date || new Date(Date.now() + 86400000).toISOString().substring(0, 10);
+  var entries = payload.entries || [];
+
+  if (!entries.length) {
+    throw new Error('No batch timetable entries provided');
+  }
+
+  var existingSessions = getTableData('ClassSessions');
+  var saved = [];
+
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    if (entry.is_active === false) continue;
+
+    var matchedSession = null;
+    for (var s = 0; s < existingSessions.length; s++) {
+      if (existingSessions[s].batch_id === entry.batch_id && existingSessions[s].date === date) {
+        matchedSession = existingSessions[s];
+        break;
+      }
+    }
+
+    var sessionData = {
+      batch_id: entry.batch_id,
+      module_code: entry.module_code || 'M01',
+      trainer_id: entry.trainer_id || entry.default_trainer_id || 'TR-101',
+      date: date,
+      start_time: entry.start_time || '10:00',
+      end_time: entry.end_time || '12:00',
+      hours: Number(entry.hours) || 2,
+      audience: entry.audience || 'ALL',
+      status: entry.status || 'PLANNED',
+      topics_covered_note: entry.topics_covered_note || ''
+    };
+
+    var resultSession = null;
+    if (matchedSession) {
+      resultSession = updateRecord('ClassSessions', matchedSession.id, sessionData, currentUser.id);
+    } else {
+      sessionData.session_id = 'SES-' + Utilities.getUuid().substring(0, 8).toUpperCase();
+      resultSession = insertRecord('ClassSessions', sessionData, currentUser.id);
+    }
+    saved.push(resultSession);
+
+    // Notify batch
+    insertRecord('Notifications', {
+      recipient_user_id: 'BATCH_' + entry.batch_id,
+      role_target: 'STUDENT',
+      title: 'Timetable Updated: ' + sessionData.module_code + ' on ' + date,
+      message: 'Class scheduled (' + sessionData.hours + ' hrs) from ' + sessionData.start_time + ' to ' + sessionData.end_time + ' with trainer ' + sessionData.trainer_id,
+      type: 'TIMETABLE_UPDATE',
+      is_read: false
+    }, currentUser.id);
+  }
+
+  logAudit('BULK_SAVE_TIMETABLE', 'ClassSessions', 'BULK_' + date, { count: saved.length, date: date }, currentUser);
+
+  return { ok: true, data: { count: saved.length, date: date, items: saved } };
+}
+
+/**
+ * 6. Get Batches & Filter
  */
 function getBatchesList(filters, currentUser) {
   var batches = getTableData('Batches');
@@ -308,3 +375,4 @@ function getBatchesList(filters, currentUser) {
   }
   return { ok: true, data: batches };
 }
+

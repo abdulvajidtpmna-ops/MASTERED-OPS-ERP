@@ -1,20 +1,22 @@
 /**
  * MLC ERP - Notes & Study Materials Module
- * Handles centralized notes library management, trainer batch assignment,
- * and role-restricted student access controls.
+ * Handles centralized notes library management, module-wise docs & PDFs,
+ * trainer assignment, batch distribution, and role-restricted student access controls.
  */
 
 /**
- * 1. Add / Update Study Note in Library (MAIN_ADMIN / OPS_ADMIN)
+ * 1. Add / Update Study Note in Library (MAIN_ADMIN / OPS_ADMIN / TRAINER)
  */
 function saveNote(payload, currentUser) {
-  requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN']);
+  requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'TRAINER']);
 
   var moduleCode = payload.module_code;
   var topicId = payload.topic_id || '';
   var title = payload.title;
-  var fileType = payload.file_type || 'PDF'; // PDF | DOC | LINK | VIDEO
+  var fileType = payload.file_type || 'PDF'; // PDF | DOC | LINK
   var fileUrl = payload.file_url;
+  var description = payload.description || '';
+  var assignedTrainerId = payload.assigned_trainer_id || (currentUser.trainer_id || '');
   var noteId = payload.id;
 
   if (!moduleCode || !title || !fileUrl) {
@@ -27,7 +29,10 @@ function saveNote(payload, currentUser) {
     title: title,
     file_type: fileType,
     file_url: fileUrl,
+    description: description,
+    assigned_trainer_id: assignedTrainerId,
     uploaded_by: currentUser.id,
+    updated_at: new Date().toISOString(),
     is_active: true
   };
 
@@ -35,16 +40,36 @@ function saveNote(payload, currentUser) {
   if (noteId) {
     savedNote = updateRecord('Notes', noteId, noteData, currentUser.id);
   } else {
+    noteData.created_at = new Date().toISOString();
     savedNote = insertRecord('Notes', noteData, currentUser.id);
   }
 
-  logAudit('SAVE_NOTE', 'Notes', savedNote.id, { title: title, module: moduleCode }, currentUser);
+  // If a batch_id was provided, also auto-assign to that batch
+  if (payload.batch_id) {
+    assignNoteToBatch({ note_id: savedNote.id, batch_id: payload.batch_id }, currentUser);
+  }
+
+  logAudit('SAVE_NOTE', 'Notes', savedNote.id, { title: title, module: moduleCode, file_type: fileType }, currentUser);
 
   return { ok: true, data: savedNote };
 }
 
 /**
- * 2. Assign Note to Batch (TRAINER / ADMIN)
+ * 2. Delete Note from Library
+ */
+function deleteNote(payload, currentUser) {
+  requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN']);
+  var noteId = payload.note_id || payload.id;
+  if (!noteId) throw new Error('Note ID is required');
+
+  deleteRecord('Notes', noteId, currentUser.id);
+  logAudit('DELETE_NOTE', 'Notes', noteId, {}, currentUser);
+
+  return { ok: true, data: { note_id: noteId, deleted: true } };
+}
+
+/**
+ * 3. Assign Note to Batch (TRAINER / ADMIN)
  */
 function assignNoteToBatch(payload, currentUser) {
   requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'TRAINER']);
@@ -79,7 +104,7 @@ function assignNoteToBatch(payload, currentUser) {
     recipient_user_id: 'BATCH_' + batchId,
     role_target: 'STUDENT',
     title: 'New Study Material Assigned: ' + noteTitle,
-    message: 'Your trainer has assigned new study notes. You can view or download them from your Student Portal.',
+    message: 'Your trainer has assigned new study notes (' + (note ? note.file_type : 'PDF') + '). You can view or download them from your Student Portal.',
     type: 'NOTE_ASSIGNED',
     is_read: false
   }, currentUser.id);
@@ -90,7 +115,7 @@ function assignNoteToBatch(payload, currentUser) {
 }
 
 /**
- * 3. Get Notes Available for User (Role-filtered)
+ * 4. Get Notes Available for User (Role-filtered)
  */
 function getAccessibleNotes(batchId, currentUser) {
   var allNotes = getTableData('Notes');
@@ -108,7 +133,7 @@ function getAccessibleNotes(batchId, currentUser) {
     }
 
     var studentNotes = allNotes.filter(function(n) {
-      return assignedNoteIds[n.id] === true;
+      return assignedNoteIds[n.id] === true && n.is_active !== false;
     });
 
     return { ok: true, data: studentNotes };
