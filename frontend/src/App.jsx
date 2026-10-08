@@ -25,12 +25,9 @@ function RoleRoute({ allowedRoles, children }) {
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
 
-  if (user.role === 'MAIN_ADMIN') {
-    return children;
-  }
-
   if (!allowedRoles.includes(user.role)) {
     // Redirect to default home for their role
+    if (user.role === 'MAIN_ADMIN') return <Navigate to="/dashboard/main" replace />;
     if (user.role === 'OPS_ADMIN' || user.role === 'OPS_EXEC') return <Navigate to="/dashboard/ops" replace />;
     if (user.role === 'TRAINER') return <Navigate to="/trainer" replace />;
     if (user.role === 'STUDENT') return <Navigate to="/student" replace />;

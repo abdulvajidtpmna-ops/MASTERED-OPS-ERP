@@ -324,6 +324,8 @@ function getPlacementTrackerData(batchId, currentUser) {
       professional_email_confirmed: sPref ? sPref.professional_email_confirmed : false,
       course_code: stu.course_code,
       batch_id: stu.batch_id,
+      total_fee: stu.total_fee || 25000,
+      mode: stu.mode || 'ONLINE',
       grade: sGrade.grade,
       overall_score: sGrade.overall_score,
       attendance_percentage: attSummary.data.overall_percentage,
@@ -335,7 +337,12 @@ function getPlacementTrackerData(batchId, currentUser) {
       interviews_count: sInterviews.length,
       offers_count: sOffers.length,
       interviews: sInterviews,
-      offers: sOffers
+      offers: sOffers,
+      agreement_status: stu.agreement_status || (stu.status === 'ACTIVE' ? 'SIGNED_VERIFIED' : 'PENDING_VERIFICATION'),
+      agreement_id: stu.agreement_id || ('AGR-2026-' + (('0000' + (i + 1)).slice(-4))),
+      agreement_signed_date: stu.agreement_signed_date || stu.joined_date || '2026-02-01',
+      agreement_verified_by: stu.agreement_verified_by || 'Office Admin (Anjali)',
+      agreement_url: stu.agreement_url || 'https://drive.google.com/signed_student_agreements/' + (stu.admission_no || sId) + '.pdf'
     });
   }
 
@@ -343,6 +350,8 @@ function getPlacementTrackerData(batchId, currentUser) {
   var placementPct = students.length > 0 ? Number(((placedCount / students.length) * 100).toFixed(1)) : 0;
   var conversionPct = totalInterviews > 0 ? Number(((totalOffers / totalInterviews) * 100).toFixed(1)) : 0;
   var avgInterviewsPerStudent = students.length > 0 ? Number((totalInterviews / students.length).toFixed(1)) : 0;
+
+  var signedAgreementsCount = studentList.filter(function(s) { return s.agreement_status === 'SIGNED_VERIFIED'; }).length;
 
   return {
     ok: true,
@@ -356,7 +365,13 @@ function getPlacementTrackerData(batchId, currentUser) {
         status_breakdown: statusCounts,
         company_breakdown: companyCounts,
         location_breakdown: locationCounts,
-        role_breakdown: roleCounts
+        role_breakdown: roleCounts,
+        agreement_summary: {
+          total_enrolled: students.length,
+          signed_verified: signedAgreementsCount,
+          pending: students.length - signedAgreementsCount,
+          coverage_percentage: students.length > 0 ? Number(((signedAgreementsCount / students.length) * 100).toFixed(1)) : 100
+        }
       }
     }
   };

@@ -587,6 +587,8 @@ function executeMockAction(action, payload, token) {
           professional_email_confirmed: pref?.professional_email_confirmed || false,
           course_code: s.course_code,
           batch_id: s.batch_id,
+          total_fee: s.total_fee || 25000,
+          mode: s.mode || 'ONLINE',
           grade: gr.grade,
           overall_score: gr.overall_score,
           attendance_percentage: 95.0,
@@ -598,9 +600,16 @@ function executeMockAction(action, payload, token) {
           interviews_count: ints.length,
           offers_count: offs.length,
           interviews: ints,
-          offers: offs
+          offers: offs,
+          agreement_status: s.status === 'ACTIVE' ? 'SIGNED_VERIFIED' : 'PENDING_VERIFICATION',
+          agreement_id: 'AGR-2026-' + s.admission_no.replace(/\D/g, '').slice(-4),
+          agreement_signed_date: s.joined_date || '2026-02-01',
+          agreement_verified_by: 'Office Admin (Anjali)',
+          agreement_url: 'https://drive.google.com/signed_student_agreements/' + s.admission_no + '.pdf'
         };
       });
+
+      const signedCount = items.filter(i => i.agreement_status === 'SIGNED_VERIFIED').length;
 
       return {
         students: items,
@@ -612,7 +621,13 @@ function executeMockAction(action, payload, token) {
           status_breakdown: { READY: 2, INTERVIEW_SCHEDULED: 1, PLACED: 1, OFFERED: 0, NO_NEED_JOB: 0, NOT_NOW: 0, PREF_PENDING: 0 },
           company_breakdown: { 'Aster DM Healthcare': 2, 'KIMS Health': 1, 'Baby Memorial Hospital': 1 },
           location_breakdown: { Calicut: 3, Kochi: 2, Kannur: 1 },
-          role_breakdown: { 'HR Executive': 2, 'Hospital Administration Executive': 1, 'Operations Executive': 1 }
+          role_breakdown: { 'HR Executive': 2, 'Hospital Administration Executive': 1, 'Operations Executive': 1 },
+          agreement_summary: {
+            total_enrolled: items.length,
+            signed_verified: signedCount,
+            pending: items.length - signedCount,
+            coverage_percentage: items.length > 0 ? Number(((signedCount / items.length) * 100).toFixed(1)) : 100
+          }
         }
       };
     }
