@@ -5,14 +5,12 @@ import {
   Bell,
   Search,
   Sparkles,
-  CheckCircle,
-  X,
-  ExternalLink,
   ShieldCheck,
+  X,
 } from 'lucide-react';
 
-export function TopBar({ collapsed, setCollapsed }) {
-  const { user, switchDemoRole } = useAuth();
+export function TopBar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
+  const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, title: 'Interview Scheduled', msg: 'Rahul Krishnan shortlisted for Aster DM Healthcare.', time: '10m ago', unread: true },
@@ -24,20 +22,35 @@ export function TopBar({ collapsed, setCollapsed }) {
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
+  const handleMenuClick = () => {
+    // On small screens, toggle the slide-over mobile drawer
+    if (window.innerWidth < 768) {
+      if (setMobileOpen) setMobileOpen(!mobileOpen);
+    } else {
+      // On desktop, collapse/expand the left sidebar
+      if (setCollapsed) setCollapsed(!collapsed);
+    }
+  };
+
   return (
-    <header className="h-16 bg-white border-b border-gray-200/80 shadow-sm sticky top-0 z-20 px-4 sm:px-6 flex items-center justify-between gap-4">
+    <header className="h-16 bg-white border-b border-gray-200/80 shadow-sm sticky top-0 z-20 px-3 sm:px-6 flex items-center justify-between gap-3">
       {/* Left: Menu toggle & Brand Title */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-brand-900 transition-colors"
-          title="Toggle Sidebar"
+          type="button"
+          onClick={handleMenuClick}
+          aria-label="Open Navigation Menu"
+          className="p-2.5 rounded-xl bg-brand-50 text-brand-900 hover:bg-brand-100 transition-colors flex items-center justify-center border border-brand-200/60 shadow-sm active:scale-95"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-5 h-5 text-brand-900" />
         </button>
-        <div className="hidden sm:block">
-          <span className="text-xs font-semibold text-gold-600 tracking-wider uppercase">Mastered Skill Academy</span>
-          <h2 className="text-sm font-poppins font-bold text-brand-900 leading-tight">Operations & Placement Portal</h2>
+        <div className="block">
+          <span className="text-[10px] sm:text-xs font-semibold text-gold-600 tracking-wider uppercase block leading-none">
+            Mastered Academy
+          </span>
+          <h2 className="text-xs sm:text-sm font-poppins font-bold text-brand-900 leading-tight truncate max-w-[180px] sm:max-w-none">
+            MLC ERP Operations
+          </h2>
         </div>
       </div>
 
@@ -54,7 +67,7 @@ export function TopBar({ collapsed, setCollapsed }) {
       </div>
 
       {/* Right: Role indicator, Bell, Profile */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Quick Role Badge */}
         <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-brand-50 to-gold-50 border border-gold-300/50 rounded-xl text-xs font-medium text-brand-900">
           <ShieldCheck className="w-3.5 h-3.5 text-gold-600" />
@@ -75,7 +88,7 @@ export function TopBar({ collapsed, setCollapsed }) {
 
           {/* Notifications Dropdown Drawer */}
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 py-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute right-0 mt-2 w-72 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 py-3 z-50 animate-in fade-in zoom-in-95 duration-150">
               <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between">
                 <h4 className="font-poppins font-semibold text-sm text-brand-900">Notifications</h4>
                 <button
@@ -87,7 +100,7 @@ export function TopBar({ collapsed, setCollapsed }) {
               </div>
               <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
                 {notifications.map((n) => (
-                  <div key={n.id} className={`p-3.5 hover:bg-brand-50/40 transition-colors ${n.unread ? 'bg-blue-50/30' : ''}`}>
+                  <div key={n.id} className={`p-3 hover:bg-brand-50/40 transition-colors ${n.unread ? 'bg-blue-50/30' : ''}`}>
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-xs font-semibold text-brand-900">{n.title}</p>
                       <span className="text-[10px] text-gray-400">{n.time}</span>
@@ -101,7 +114,7 @@ export function TopBar({ collapsed, setCollapsed }) {
         </div>
 
         {/* Profile Avatar */}
-        <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
+        <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-gray-200">
           <div className="w-8 h-8 rounded-xl bg-blue-shine text-white font-bold flex items-center justify-center text-xs shadow-sm">
             {user.full_name?.charAt(0) || 'U'}
           </div>

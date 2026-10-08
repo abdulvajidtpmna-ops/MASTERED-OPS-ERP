@@ -17,6 +17,9 @@ import {
   MessageSquare,
   Send,
   Sparkles,
+  Users,
+  Calendar,
+  Layers,
 } from 'lucide-react';
 
 export function TrainerConsolePage() {
@@ -44,30 +47,42 @@ export function TrainerConsolePage() {
   const loadTrainerData = async () => {
     try {
       setLoading(true);
-      const [batchList, admList, chat] = await Promise.all([
+      const [batchList, admList] = await Promise.all([
         apiCall('getBatchesList'),
         apiCall('getAdmissions'),
-        apiCall('getBatchChatMessages', { batch_id: selectedBatchId }),
       ]);
-      setBatches(batchList || []);
-      const bId = selectedBatchId || (batchList && batchList.length ? batchList[0].id : '');
-      setSelectedBatchId(bId);
 
-      const enrolled = (admList?.items || []).filter(s => !bId || s.batch_id === bId);
+      const bList = batchList || [];
+      setBatches(bList);
+
+      const targetBatchId = selectedBatchId || (bList.length ? bList[0].id : '');
+      if (!selectedBatchId && targetBatchId) {
+        setSelectedBatchId(targetBatchId);
+      }
+
+      // Filter students by chosen batch (or show all if unassigned)
+      const allStudents = admList?.items || [];
+      const enrolled = targetBatchId
+        ? allStudents.filter((s) => s.batch_id === targetBatchId || !s.batch_id)
+        : allStudents;
       setStudents(enrolled);
 
-      // Default attendance to 'P'
+      // Default attendance to 'P' and assessments to 85
       const initAtt = {};
       const initScores = {};
-      enrolled.forEach(s => {
+      enrolled.forEach((s) => {
         initAtt[s.student_id] = 'P';
         initScores[s.student_id] = 85;
       });
       setAttendanceRows(initAtt);
       setAssessmentScores(initScores);
-      setChatMessages(chat?.messages || []);
+
+      if (targetBatchId) {
+        const chat = await apiCall('getBatchChatMessages', { batch_id: targetBatchId });
+        setChatMessages(chat?.messages || []);
+      }
     } catch (err) {
-      toast.error('Failed to load trainer console.');
+      toast.error('Failed to load trainer console data.');
     } finally {
       setLoading(false);
     }
@@ -79,7 +94,7 @@ export function TrainerConsolePage() {
 
   const handleSelectAllPresent = () => {
     const updated = {};
-    students.forEach(s => {
+    students.forEach((s) => {
       updated[s.student_id] = 'P';
     });
     setAttendanceRows(updated);
@@ -97,7 +112,7 @@ export function TrainerConsolePage() {
       await apiCall('markAttendance', {
         session_id: 'SES-001',
         rows,
-        topics_covered_note: topicsCoveredNote || 'Live classroom practicals conducted.',
+        topics_covered_note: topicsCoveredNote || 'Live classroom session practicals conducted.',
       });
 
       toast.success('Session attendance verified and saved successfully!');
@@ -120,7 +135,7 @@ export function TrainerConsolePage() {
           score: Number(score),
         });
       }
-      toast.success(`Assessment marks for ${selectedModule} (${assessmentType}) recorded and grades re-calculated!`);
+      toast.success(`Assessment marks for ${selectedModule} (${assessmentType}) recorded and grades calculated!`);
     } catch (err) {
       toast.error(err.message || 'Failed to save marks.');
     } finally {
@@ -133,46 +148,102 @@ export function TrainerConsolePage() {
     if (!newMessage.trim()) return;
     try {
       const msg = await apiCall('sendBatchChatMessage', {
-        batch_id: selectedBatchId,
+        batch_id: selectedBatchId || 'batch-1',
         message: newMessage,
       });
-      setChatMessages(prev => [...prev, msg]);
+      setChatMessages((prev) => [...prev, msg]);
       setNewMessage('');
     } catch (err) {
       toast.error('Failed to send message.');
     }
   };
 
+  const activeBatch = batches.find((b) => b.id === selectedBatchId) || batches[0];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Top Banner */}
       <div className="bg-gradient-to-r from-brand-900 via-brand-700 to-brand-500 p-6 rounded-2xl text-white shadow-soft-blue flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-semibold text-gold-400 uppercase tracking-widest">Faculty Academic Portal</span>
-          <h1 className="text-2xl font-poppins font-bold mt-0.5">Trainer Classroom Console</h1>
-          <p className="text-xs text-brand-100 mt-1">Daily session attendance grid, multi-component assessments, notes assignment, and batch discussion</p>
+          <span className="text-xs font-semibold text-gold-400 uppercase tracking-widest">Faculty Academic Console</span>
+          <h1 className="text-2xl font-poppins font-bold mt-0.5">Trainer Classroom Desk</h1>
+          <p className="text-xs text-brand-100 mt-1">
+            Conduct daily sessions, mark live attendance, enter assessments, assign study notes, and lead discussions
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={selectedBatchId}
-            onChange={(e) => setSelectedBatchId(e.target.value)}
-            className="p-2 text-xs bg-brand-900/80 border border-brand-300/40 rounded-xl text-gold-300 font-bold"
-          >
-            {batches.map(b => (
-              <option key={b.id} value={b.id}>{b.name} ({b.batch_code})</option>
-            ))}
-          </select>
+          <span className="px-3 py-1.5 bg-gold-shine text-brand-900 font-bold text-xs rounded-xl shadow-gold-glow flex items-center gap-1.5">
+            <GraduationCap className="w-4 h-4" /> Faculty Portal
+          </span>
         </div>
+      </div>
+
+      {/* PROMINENT BATCH COHORT SELECTOR BAR */}
+      <div className="bg-white p-5 rounded-2xl border-2 border-brand-500/30 shadow-soft-blue space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-brand-50 rounded-xl text-brand-700 border border-brand-200">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-gold-600 uppercase tracking-wider block">
+                Select Teaching Cohort
+              </span>
+              <h3 className="font-poppins font-bold text-brand-900 text-base">
+                Active Training Batch
+              </h3>
+            </div>
+          </div>
+
+          {/* Large Dropdown Selector */}
+          <div className="w-full sm:w-80">
+            <select
+              value={selectedBatchId}
+              onChange={(e) => setSelectedBatchId(e.target.value)}
+              className="w-full p-3 text-sm font-bold text-brand-900 bg-gray-50 border-2 border-brand-500 rounded-xl focus:outline-none focus:ring-4 focus:ring-brand-500/20 shadow-sm cursor-pointer"
+            >
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.batch_code})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Selected Batch Details Strip */}
+        {activeBatch && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-gray-100 text-xs">
+            <div className="p-2.5 bg-brand-50/60 rounded-xl border border-brand-100">
+              <span className="text-[10px] text-gray-500 block uppercase font-semibold">Batch Code</span>
+              <strong className="font-mono text-brand-700 font-bold">{activeBatch.batch_code}</strong>
+            </div>
+            <div className="p-2.5 bg-brand-50/60 rounded-xl border border-brand-100">
+              <span className="text-[10px] text-gray-500 block uppercase font-semibold">Course & Mode</span>
+              <strong className="text-brand-900 font-bold">{activeBatch.course_code} ({activeBatch.mode})</strong>
+            </div>
+            <div className="p-2.5 bg-brand-50/60 rounded-xl border border-brand-100">
+              <span className="text-[10px] text-gray-500 block uppercase font-semibold">Enrolled Students</span>
+              <strong className="text-emerald-700 font-bold">{students.length} Candidates</strong>
+            </div>
+            <div className="p-2.5 bg-brand-50/60 rounded-xl border border-brand-100 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-gray-500 block uppercase font-semibold">Batch Status</span>
+                <StatusBadge status={activeBatch.status} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation Tabs */}
       <div className="flex gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('ATTENDANCE')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'ATTENDANCE'
               ? 'bg-brand-900 text-white shadow-sm'
-              : 'bg-white text-gray-600 hover:bg-gray-100'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
           }`}
         >
           <CheckCircle2 className="w-4 h-4 text-gold-400" />
@@ -180,10 +251,10 @@ export function TrainerConsolePage() {
         </button>
         <button
           onClick={() => setActiveTab('ASSESSMENTS')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'ASSESSMENTS'
               ? 'bg-brand-900 text-white shadow-sm'
-              : 'bg-white text-gray-600 hover:bg-gray-100'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
           }`}
         >
           <Award className="w-4 h-4 text-gold-400" />
@@ -191,10 +262,10 @@ export function TrainerConsolePage() {
         </button>
         <button
           onClick={() => setActiveTab('NOTES')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'NOTES'
               ? 'bg-brand-900 text-white shadow-sm'
-              : 'bg-white text-gray-600 hover:bg-gray-100'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
           }`}
         >
           <FileText className="w-4 h-4 text-gold-400" />
@@ -202,10 +273,10 @@ export function TrainerConsolePage() {
         </button>
         <button
           onClick={() => setActiveTab('CHAT')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'CHAT'
               ? 'bg-brand-900 text-white shadow-sm'
-              : 'bg-white text-gray-600 hover:bg-gray-100'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
           }`}
         >
           <MessageSquare className="w-4 h-4 text-gold-400" />
@@ -216,7 +287,7 @@ export function TrainerConsolePage() {
       {/* 1. ATTENDANCE ENTRY GRID */}
       {activeTab === 'ATTENDANCE' && (
         <Card
-          title="Today's Session Attendance Grid"
+          title={`Session Attendance: ${activeBatch?.name || 'Current Batch'}`}
           subtitle="Mark Present (P), Absent (A), or Late (L - counts as present)"
           action={
             <div className="flex items-center gap-2">
@@ -233,10 +304,10 @@ export function TrainerConsolePage() {
             <div className="p-3 bg-brand-50 border border-brand-100 rounded-xl flex items-center justify-between text-xs">
               <div>
                 <strong className="text-brand-900">Module M01: Ice Breaking & Public Speaking</strong>
-                <p className="text-gray-500">Session ID: SES-001 • Duration: 2.0 Hours</p>
+                <p className="text-gray-500">Duration: 2.0 Hours • Batch: {activeBatch?.batch_code}</p>
               </div>
               <span className="font-semibold text-brand-700 bg-white px-2.5 py-1 rounded border border-brand-200">
-                Editing Window: Active (Day 1 of 7)
+                Editing Window: Active (7 Days)
               </span>
             </div>
 
@@ -420,7 +491,7 @@ export function TrainerConsolePage() {
 
       {/* 3. NOTES ASSIGNMENT */}
       {activeTab === 'NOTES' && (
-        <Card title="Assign Study Materials to Active Cohort" subtitle="Students see only assigned/completed module notes">
+        <Card title={`Assign Study Materials to: ${activeBatch?.name || 'Cohort'}`} subtitle="Students see only assigned/completed module notes">
           <div className="space-y-3">
             {[
               { id: 'not-1', code: 'M01', title: 'Future Career Foundation Comprehensive Guidebook', file: 'PDF (3.4 MB)', assigned: true },
@@ -454,7 +525,7 @@ export function TrainerConsolePage() {
 
       {/* 4. BATCH COMMUNITY CHAT */}
       {activeTab === 'CHAT' && (
-        <Card title="Batch Discussion Room" subtitle="Real-time interactive group chat with batch students">
+        <Card title={`Batch Discussion: ${activeBatch?.name || 'Classroom Room'}`} subtitle="Real-time interactive group chat with enrolled students">
           <div className="flex flex-col h-[400px]">
             <div className="flex-1 overflow-y-auto space-y-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
               {chatMessages.map((m) => (

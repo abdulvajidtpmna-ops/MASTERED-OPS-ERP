@@ -8,6 +8,7 @@ import { MobileTabBar } from './MobileTabBar';
 export function AppLayout() {
   const { user, loading } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   if (loading) {
     return (
@@ -28,14 +29,24 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col">
-      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      <Sidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
       <div className={`flex-1 flex flex-col transition-all duration-300 ${collapsed ? 'md:pl-20' : 'md:pl-64'}`}>
-        <TopBar collapsed={collapsed} setCollapsed={setCollapsed} />
-        <main className="flex-1 p-4 sm:p-6 pb-20 md:pb-8 max-w-7xl w-full mx-auto animate-in fade-in duration-200">
+        <TopBar
+          collapsed={collapsed}
+          setCollapsed={setCollapsed}
+          mobileOpen={mobileOpen}
+          setMobileOpen={setMobileOpen}
+        />
+        <main className="flex-1 p-4 sm:p-6 pb-24 md:pb-8 max-w-7xl w-full mx-auto animate-in fade-in duration-200">
           <Outlet />
         </main>
       </div>
-      <MobileTabBar />
+      <MobileTabBar setMobileOpen={setMobileOpen} />
     </div>
   );
 }
