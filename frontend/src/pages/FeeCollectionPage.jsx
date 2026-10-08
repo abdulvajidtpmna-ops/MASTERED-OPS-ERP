@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiCall } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Card } from '../components/common/Card';
 import { Table } from '../components/common/Table';
@@ -14,10 +15,16 @@ import {
   AlertCircle,
   Download,
   MailCheck,
+  AlertTriangle,
+  History,
+  ShieldCheck,
+  UserX,
 } from 'lucide-react';
 
 export function FeeCollectionPage() {
+  const { user } = useAuth();
   const [students, setStudents] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [installments, setInstallments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +33,7 @@ export function FeeCollectionPage() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [postponeModalOpen, setPostponeModalOpen] = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
   const [activeInstallment, setActiveInstallment] = useState(null);
   const [lastReceipt, setLastReceipt] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -44,14 +52,24 @@ export function FeeCollectionPage() {
     reason: '',
   });
 
+  // Outcome Status State (Section 8)
+  const [outcomeForm, setOutcomeForm] = useState({
+    outcome_status: 'ACTIVE',
+    reason: '',
+  });
+
   const toast = useToast();
 
-  const loadStudents = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const res = await apiCall('getAdmissions');
-      const items = res?.items || [];
+      const [resStudents, resBatches] = await Promise.all([
+        apiCall('getAdmissions'),
+        apiCall('getBatchesList'),
+      ]);
+      const items = resStudents?.items || [];
       setStudents(items);
+      setBatches(resBatches || []);
       if (items.length && !selectedStudent) {
         selectStudent(items[0]);
       }
@@ -64,10 +82,8 @@ export function FeeCollectionPage() {
 
   const selectStudent = (student) => {
     setSelectedStudent(student);
-    const total = Number(student.total_fee) || 25000;
     const isStudent2 = student.student_id === 'STU-002';
 
-    // Build installment list for UI display
     const instList = [
       {
         id: 'inst-0',
@@ -131,7 +147,7 @@ export function FeeCollectionPage() {
   };
 
   useEffect(() => {
-    loadStudents();
+    loadData();
   }, []);
 
   const handleRecordPayment = async (e) => {
@@ -195,175 +211,193 @@ export function FeeCollectionPage() {
     }
   };
 
+  // Student Outcome Status Update (Section 8)
+  const handleSaveOutcome = async (e) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+
+    setSubmitting(true);
+    try {
+      await apiCall('setStudentOutcomeStatus', {
+        student_id: selectedStudent.student_id,
+        outcome_status: outcomeForm.outcome_status,
+        reason: outcomeForm.reason,
+      });
+
+      toast.success(`Student outcome updated to '${outcomeForm.outcome_status}'!`);
+      setOutcomeModalOpen(false);
+      loadData();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update outcome status.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const formatINR = (val) => '₹' + (Number(val) || 0).toLocaleString('en-IN');
 
-  const totalFee = Number(selectedStudent?.total_fee) || 25000;
-  const totalPaid = installments.reduce((sum, i) => sum + (Number(i.paid_amount) || 0), 0);
-  const totalBalance = totalFee - totalPaid;
+  const assignedBatch = batches.find((b) => b.id === selectedStudent?.batch_id);
+  let batchPostponed = false;
+  if (assignedBatch?.start_date_history_json) {
+    try {
+      const hist = JSON.parse(assignedBatch.start_date_history_json);
+      batchPostponed = hist.length > 0;
+    } catch (e) {}
+  }
 
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-brand-900 via-brand-700 to-brand-500 p-6 rounded-2xl text-white shadow-soft-blue flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-brand-900 to-brand-700 p-6 rounded-2xl text-white shadow-soft-blue flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-semibold text-gold-400 uppercase tracking-widest">Office Administration Desk</span>
-          <h1 className="text-2xl font-poppins font-bold mt-0.5">Fee Collection & Vouchers</h1>
-          <p className="text-xs text-brand-100 mt-1">Record payments, generate instant receipts, submit postponement requests and track reminders</p>
+          <span className="text-xs font-semibold text-gold-400 uppercase tracking-widest">Office Admin & Accounts</span>
+          <h1 className="text-2xl font-poppins font-bold mt-0.5">Fee Collections, Receipts & Ledger</h1>
+          <p className="text-xs text-brand-100 mt-1">Record payments with automated due/paid month tagging and update student outcome retention statuses</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Student Selector List */}
-        <Card title="Student Accounts" subtitle="Select candidate to view fee ledger">
-          <div className="space-y-2 max-h-[580px] overflow-y-auto">
-            {students.map((s) => (
+        {/* Student Selector Card */}
+        <Card title="Select Student" subtitle="Search candidate roster">
+          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+            {students.map((st) => (
               <div
-                key={s.id}
-                onClick={() => selectStudent(s)}
+                key={st.id || st.student_id}
+                onClick={() => selectStudent(st)}
                 className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                  selectedStudent?.id === s.id
-                    ? 'bg-brand-50 border-brand-500 shadow-sm ring-1 ring-brand-500/30'
-                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                  selectedStudent?.student_id === st.student_id
+                    ? 'bg-brand-50 border-brand-500 shadow-sm'
+                    : 'bg-white border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h5 className="font-semibold text-xs text-brand-900">{s.full_name}</h5>
-                    <p className="font-mono text-[11px] text-brand-700">{s.admission_no}</p>
-                  </div>
-                  <span className="text-xs font-bold text-gray-800">{formatINR(s.total_fee)}</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold text-brand-700">{st.admission_no}</span>
+                  <StatusBadge status={st.status} />
                 </div>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-500">
-                  <span>{s.course_code} • {s.mode}</span>
-                  <StatusBadge status={s.status} />
-                </div>
+                <h4 className="font-bold text-brand-900 text-sm mt-1">{st.full_name}</h4>
+                <p className="text-[11px] text-gray-500">{st.course_code} • {st.mobile}</p>
+                {st.outcome_status && st.outcome_status !== 'ACTIVE' && (
+                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                    {st.outcome_status}
+                  </span>
+                )}
               </div>
             ))}
           </div>
         </Card>
 
-        {/* Right 2 Columns: Selected Student Fee Plan & Installments Table */}
-        <div className="lg:col-span-2 space-y-6">
-          {selectedStudent && (
-            <>
-              {/* Financial Snapshot Summary Card */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-4 rounded-xl bg-white border border-gray-200 shadow-sm">
-                  <span className="text-[10px] text-gray-400 font-bold uppercase">Total Fee</span>
-                  <h4 className="text-xl font-poppins font-bold text-brand-900 mt-1">{formatINR(totalFee)}</h4>
-                  <span className="text-[11px] text-gray-500">{selectedStudent.course_code} Course Plan</span>
-                </div>
-                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 shadow-sm">
-                  <span className="text-[10px] text-emerald-700 font-bold uppercase">Total Paid</span>
-                  <h4 className="text-xl font-poppins font-bold text-emerald-800 mt-1">{formatINR(totalPaid)}</h4>
-                  <span className="text-[11px] text-emerald-600 font-medium">Acknowledged</span>
-                </div>
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 shadow-sm">
-                  <span className="text-[10px] text-amber-700 font-bold uppercase">Balance Pending</span>
-                  <h4 className="text-xl font-poppins font-bold text-amber-800 mt-1">{formatINR(totalBalance)}</h4>
-                  <span className="text-[11px] text-amber-600 font-medium">Installments due</span>
+        {/* Selected Student Ledger & Action Desk */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Postponement Warning Banner (Section 1) */}
+          {batchPostponed && (
+            <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl text-amber-900 text-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div>
+                  <strong className="text-sm font-bold text-amber-900 block">
+                    Batch Start Date Moved — Review Installment Dates!
+                  </strong>
+                  <span>
+                    Cohort <strong>{assignedBatch?.name}</strong> start date was postponed to {assignedBatch?.start_date}. Review student installment schedules if needed.
+                  </span>
                 </div>
               </div>
-
-              {/* Installments Table */}
-              <Card
-                title={`Fee Plan: ${selectedStudent.full_name} (${selectedStudent.admission_no})`}
-                subtitle="Registration fee, start-day balance, and 4 course installments"
-              >
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-500 uppercase font-poppins">
-                        <th className="pb-3">Item / Installment</th>
-                        <th className="pb-3">Due Date</th>
-                        <th className="pb-3 text-right">Amount</th>
-                        <th className="pb-3 text-right">Paid</th>
-                        <th className="pb-3 text-center">Status</th>
-                        <th className="pb-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {installments.map((inst, idx) => (
-                        <tr key={idx} className="hover:bg-brand-50/30">
-                          <td className="py-3 font-semibold text-brand-900">
-                            {inst.title}
-                          </td>
-                          <td className="py-3 text-gray-600">{inst.due_date}</td>
-                          <td className="py-3 text-right font-bold text-gray-800">{formatINR(inst.amount)}</td>
-                          <td className="py-3 text-right font-semibold text-emerald-600">{formatINR(inst.paid_amount || 0)}</td>
-                          <td className="py-3 text-center">
-                            <StatusBadge status={inst.status} />
-                          </td>
-                          <td className="py-3 text-right">
-                            {inst.status !== 'PAID' ? (
-                              <div className="flex items-center justify-end gap-1.5">
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  icon={IndianRupee}
-                                  onClick={() => {
-                                    setActiveInstallment(inst);
-                                    setPayData({
-                                      amount: String(inst.amount - (inst.paid_amount || 0)),
-                                      payment_mode: 'UPI',
-                                      reference_no: '',
-                                      remarks: '',
-                                    });
-                                    setPaymentModalOpen(true);
-                                  }}
-                                >
-                                  Collect
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  icon={CalendarClock}
-                                  onClick={() => {
-                                    setActiveInstallment(inst);
-                                    setPostponeData({ requested_due_date: '', reason: '' });
-                                    setPostponeModalOpen(true);
-                                  }}
-                                >
-                                  Postpone
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="text-[11px] text-emerald-600 font-bold flex items-center justify-end gap-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Paid on {inst.paid_date}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-
-              {/* Reminders Dispatch Audit Log */}
-              <Card title="Fee Reminder Notifications Dispatched" subtitle="Automated 08:00 AM daily trigger log">
-                <div className="space-y-2">
-                  {[
-                    { type: '3 Days Before Due Date', date: '2026-02-09', channel: 'Email + In-App', status: 'Delivered' },
-                    { type: 'Payment Receipt Confirmation', date: '2026-02-10', channel: 'Email (PDF attached)', status: 'Delivered' },
-                  ].map((rem, i) => (
-                    <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <MailCheck className="w-4 h-4 text-emerald-600" />
-                        <div>
-                          <strong className="text-brand-900">{rem.type}</strong>
-                          <p className="text-[11px] text-gray-500">Sent on {rem.date} via {rem.channel}</p>
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                        {rem.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </>
+            </div>
           )}
+
+          {/* Student Profile & Outcome Status Bar */}
+          <Card
+            title={
+              <div className="flex items-center gap-3">
+                <span>{selectedStudent?.full_name || 'Student Ledger'}</span>
+                <span className="font-mono text-xs font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200">
+                  {selectedStudent?.admission_no}
+                </span>
+              </div>
+            }
+            subtitle={`Course: ${selectedStudent?.course_code} • Total Fee: ${formatINR(selectedStudent?.total_fee || 25000)}`}
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={UserX}
+                onClick={() => {
+                  setOutcomeForm({
+                    outcome_status: selectedStudent?.outcome_status || 'ACTIVE',
+                    reason: selectedStudent?.outcome_reason || '',
+                  });
+                  setOutcomeModalOpen(true);
+                }}
+              >
+                Set Outcome Status
+              </Button>
+            }
+          >
+            {/* Installments Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200 uppercase text-gray-500 font-poppins text-[11px] bg-gray-50">
+                    <th className="py-3 px-3">Installment Title</th>
+                    <th className="py-3 px-3">Due Date</th>
+                    <th className="py-3 px-3 text-right">Amount</th>
+                    <th className="py-3 px-3 text-right">Paid</th>
+                    <th className="py-3 px-3 text-center">Status</th>
+                    <th className="py-3 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {installments.map((inst) => (
+                    <tr key={inst.id} className="hover:bg-brand-50/30">
+                      <td className="py-3 px-3 font-semibold text-brand-900">{inst.title}</td>
+                      <td className="py-3 px-3 text-gray-600 font-mono">{inst.due_date}</td>
+                      <td className="py-3 px-3 text-right font-bold text-brand-900">{formatINR(inst.amount)}</td>
+                      <td className="py-3 px-3 text-right font-semibold text-emerald-600">{formatINR(inst.paid_amount || 0)}</td>
+                      <td className="py-3 px-3 text-center">
+                        <StatusBadge status={inst.status} />
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        {inst.status !== 'PAID' ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              icon={IndianRupee}
+                              onClick={() => {
+                                setActiveInstallment(inst);
+                                setPayData({
+                                  amount: inst.amount - (inst.paid_amount || 0),
+                                  payment_mode: 'UPI',
+                                  reference_no: '',
+                                  remarks: '',
+                                });
+                                setPaymentModalOpen(true);
+                              }}
+                            >
+                              Pay
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setActiveInstallment(inst);
+                                setPostponeData({ requested_due_date: '', reason: '' });
+                                setPostponeModalOpen(true);
+                              }}
+                            >
+                              Postpone
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-emerald-700 font-bold">✓ Settled</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
       </div>
 
@@ -371,65 +405,69 @@ export function FeeCollectionPage() {
       <Modal
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
-        title="Record Fee Payment & Issue Receipt"
+        title="Record Fee Payment Receipt"
         subtitle={`Student: ${selectedStudent?.full_name} • ${activeInstallment?.title}`}
       >
-        <form onSubmit={handleRecordPayment} className="space-y-4">
+        <form onSubmit={handleRecordPayment} className="space-y-4 text-xs">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-              Amount to Collect (₹) *
+            <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Payment Amount (₹) *
             </label>
             <input
               type="number"
               required
               value={payData.amount}
               onChange={(e) => setPayData({ ...payData, amount: e.target.value })}
-              className="w-full p-2.5 text-base font-bold bg-white border border-gray-200 rounded-xl text-brand-900"
+              className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold text-brand-900 text-base"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
                 Payment Mode *
               </label>
               <select
                 value={payData.payment_mode}
                 onChange={(e) => setPayData({ ...payData, payment_mode: e.target.value })}
-                className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-bold text-brand-900"
+                className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold text-brand-900"
               >
-                <option value="UPI">UPI / Google Pay / PhonePe</option>
-                <option value="CASH">Cash at Office Desk</option>
-                <option value="BANK_TRANSFER">Direct Bank Transfer / NEFT</option>
-                <option value="CARD">Credit / Debit Card POS</option>
+                <option value="UPI">UPI (GPay / PhonePe / Paytm)</option>
+                <option value="BANK_TRANSFER">Bank Transfer / NEFT / IMPS</option>
+                <option value="CASH">Cash Deposit at Academy</option>
+                <option value="CARD">Debit / Credit Card</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                Transaction / Reference Number
+              <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Transaction / UTR Reference No
               </label>
               <input
                 type="text"
-                placeholder="e.g. UPI-92384729"
+                placeholder="e.g. UPI-98471203492"
                 value={payData.reference_no}
                 onChange={(e) => setPayData({ ...payData, reference_no: e.target.value })}
-                className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-mono"
+                className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-              Remarks
+            <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Remarks & Accounting Notes
             </label>
             <input
               type="text"
-              placeholder="e.g. Paid in full for 1st installment"
+              placeholder="e.g. Verified by Accounts desk (Anjali)"
               value={payData.remarks}
               onChange={(e) => setPayData({ ...payData, remarks: e.target.value })}
-              className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl"
+              className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-medium"
             />
+          </div>
+
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-[11px]">
+            ℹ️ Stores <strong>paid_month</strong> ({new Date().toISOString().substring(0, 7)}) and attributes 10% commission to Sales Rep ({selectedStudent?.sales_staff_id || 'Staff'}).
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
@@ -437,7 +475,60 @@ export function FeeCollectionPage() {
               Cancel
             </Button>
             <Button type="submit" variant="primary" size="md" loading={submitting}>
-              Confirm Payment & Generate Receipt
+              Generate Receipt & Record Payment
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Set Student Outcome Status Modal (Section 8) */}
+      <Modal
+        isOpen={outcomeModalOpen}
+        onClose={() => setOutcomeModalOpen(false)}
+        title="Update Student Outcome Status"
+        subtitle={`Student: ${selectedStudent?.full_name} (${selectedStudent?.admission_no})`}
+      >
+        <form onSubmit={handleSaveOutcome} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Outcome Status *
+            </label>
+            <select
+              value={outcomeForm.outcome_status}
+              onChange={(e) => setOutcomeForm({ ...outcomeForm, outcome_status: e.target.value })}
+              className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold text-brand-900"
+            >
+              <option value="ACTIVE">ACTIVE (Ongoing Active Student)</option>
+              <option value="COMPLETED">COMPLETED (Course Finished / Alumni)</option>
+              <option value="DROPPED_AFTER_CAME">DROPPED_AFTER_CAME (Attended ≥1 class, No Penalty)</option>
+              <option value="DROPPED_WITHOUT_CAME">DROPPED_WITHOUT_CAME (Zero Attendance, −₹250 Sales Penalty)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Reason / Justification *
+            </label>
+            <textarea
+              rows={3}
+              required
+              placeholder="e.g. Student relocated to Gulf for family reasons prior to attending any sessions."
+              value={outcomeForm.reason}
+              onChange={(e) => setOutcomeForm({ ...outcomeForm, reason: e.target.value })}
+              className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-medium text-brand-900"
+            />
+          </div>
+
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[11px]">
+            ⚠️ <strong>Validation Rule:</strong> If the student has ever marked attendance in any class session, <code>DROPPED_WITHOUT_CAME</code> will be strictly rejected. Use <code>DROPPED_AFTER_CAME</code>.
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+            <Button variant="secondary" size="md" onClick={() => setOutcomeModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" size="md" loading={submitting}>
+              Save Outcome Status
             </Button>
           </div>
         </form>
@@ -447,12 +538,12 @@ export function FeeCollectionPage() {
       <Modal
         isOpen={postponeModalOpen}
         onClose={() => setPostponeModalOpen(false)}
-        title="Submit Fee Postponement Request"
-        subtitle={`For: ${activeInstallment?.title} (Current Due: ${activeInstallment?.due_date})`}
+        title="Request Installment Due Date Extension"
+        subtitle={`Student: ${selectedStudent?.full_name} • ${activeInstallment?.title}`}
       >
-        <form onSubmit={handleRequestPostpone} className="space-y-4">
+        <form onSubmit={handleRequestPostpone} className="space-y-4 text-xs">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+            <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
               New Requested Due Date *
             </label>
             <input
@@ -460,91 +551,33 @@ export function FeeCollectionPage() {
               required
               value={postponeData.requested_due_date}
               onChange={(e) => setPostponeData({ ...postponeData, requested_due_date: e.target.value })}
-              className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl"
+              className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold text-brand-900"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-              Justification & Reason *
+            <label className="block font-semibold text-gray-700 uppercase tracking-wider mb-1">
+              Justification Reason *
             </label>
             <textarea
               rows={3}
               required
-              placeholder="e.g. Student requested 15 days extension due to family emergency..."
+              placeholder="e.g. Salary delay from employer; requested 7-day grace period."
               value={postponeData.reason}
               onChange={(e) => setPostponeData({ ...postponeData, reason: e.target.value })}
-              className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl"
+              className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-medium"
             />
           </div>
-
-          <p className="text-[11px] text-gray-500">
-            ★ Note: As per institute policy, fee date modifications require approval by the Operations Administrator.
-          </p>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
             <Button variant="secondary" size="md" onClick={() => setPostponeModalOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" size="md" loading={submitting}>
-              Submit for Ops Admin Approval
+              Submit Request
             </Button>
           </div>
         </form>
-      </Modal>
-
-      {/* Fee Receipt Preview Modal */}
-      <Modal
-        isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
-        title="Official Payment Receipt"
-        subtitle={`Receipt No: ${lastReceipt?.receipt_no}`}
-        maxWidth="max-w-lg"
-        footer={
-          <Button variant="primary" size="md" onClick={() => setReceiptModalOpen(false)}>
-            Done & Send to Email
-          </Button>
-        }
-      >
-        <div className="p-4 border-2 border-dashed border-gray-300 rounded-xl bg-white space-y-4">
-          <div className="text-center border-b pb-3">
-            <h3 className="font-poppins font-bold text-brand-900 text-lg">Mastered Skill Academy</h3>
-            <p className="text-xs text-gray-500">Official Fee Payment Receipt</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-gray-400 block text-[10px] uppercase">Receipt No</span>
-              <strong className="font-mono text-brand-700">{lastReceipt?.receipt_no}</strong>
-            </div>
-            <div>
-              <span className="text-gray-400 block text-[10px] uppercase">Date</span>
-              <strong>{lastReceipt?.date}</strong>
-            </div>
-            <div>
-              <span className="text-gray-400 block text-[10px] uppercase">Student Name</span>
-              <strong className="text-brand-900">{lastReceipt?.student?.full_name}</strong>
-            </div>
-            <div>
-              <span className="text-gray-400 block text-[10px] uppercase">Admission No</span>
-              <strong className="font-mono text-brand-700">{lastReceipt?.student?.admission_no}</strong>
-            </div>
-          </div>
-
-          <div className="p-3 bg-brand-50 rounded-xl border border-brand-100 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-600 font-medium">{lastReceipt?.installment?.title}</p>
-              <p className="text-[10px] text-gray-500">Mode: {lastReceipt?.mode} ({lastReceipt?.ref || 'N/A'})</p>
-            </div>
-            <span className="text-xl font-poppins font-black text-emerald-700">
-              {formatINR(lastReceipt?.amount)}
-            </span>
-          </div>
-
-          <p className="text-[10px] text-center text-gray-400 italic">
-            This receipt has been automatically emailed to {lastReceipt?.student?.personal_email}.
-          </p>
-        </div>
       </Modal>
     </div>
   );

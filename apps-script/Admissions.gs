@@ -1,6 +1,7 @@
 /**
  * MLC ERP - Admissions Module
- * Handles student registration, auto-numbering under ScriptLock,
+ * Handles student registration, sequential auto-numbering under LockService
+ * (MA + number for OFFLINE, OMA + number for ONLINE),
  * automated student login creation, FeePlan initialization, and After-Sales task dispatch.
  */
 
@@ -34,31 +35,53 @@ function createAdmission(payload, currentUser) {
   var studentId = 'STU-' + Utilities.getUuid().substring(0, 8).toUpperCase();
 
   try {
-    var year = new Date().getFullYear();
-    var counterKey = mode === 'ONLINE' ? 'ADM_ONLINE' : 'ADM_OFFLINE';
-    var prefix = mode === 'ONLINE' ? 'ON-' : 'OF-';
+    var settingKey = mode === 'ONLINE' ? 'next_online_no' : 'next_offline_no';
+    var defaultStart = mode === 'ONLINE' ? 1034 : 2017;
+    var prefix = mode === 'ONLINE' ? 'OMA' : 'MA';
 
-    var counters = getTableData('Counters');
-    var currentCounterVal = 0;
-    var counterRowId = null;
-
-    for (var c = 0; c < counters.length; c++) {
-      if (counters[c].key === counterKey) {
-        currentCounterVal = Number(counters[c].value) || 0;
-        counterRowId = counters[c].id;
+    // Retrieve setting from Settings table
+    var settings = getTableData('Settings');
+    var targetSetting = null;
+    for (var s = 0; s < settings.length; s++) {
+      if (settings[s].key === settingKey) {
+        targetSetting = settings[s];
         break;
       }
     }
 
-    var nextVal = currentCounterVal + 1;
-    var padded = ('0000' + nextVal).slice(-4);
-    admissionNo = prefix + year + '-' + padded;
+    var currentCounterVal = targetSetting ? Number(targetSetting.value) : defaultStart;
+    if (isNaN(currentCounterVal) || currentCounterVal <= 0) {
+      currentCounterVal = defaultStart;
+    }
 
-    // Update Counter in DB
-    if (counterRowId) {
-      updateRecord('Counters', counterRowId, { value: nextVal }, currentUser.id);
+    // Check existing admission numbers in Students table to guarantee NO collision
+    var existingStudents = getTableData('Students');
+    var maxFound = currentCounterVal;
+
+    for (var i = 0; i < existingStudents.length; i++) {
+      var adm = existingStudents[i].admission_no || '';
+      if (mode === 'ONLINE' && adm.indexOf('OMA') === 0) {
+        var num = parseInt(adm.replace('OMA', ''), 10);
+        if (!isNaN(num) && num >= maxFound) maxFound = num + 1;
+      } else if (mode === 'OFFLINE' && adm.indexOf('MA') === 0 && adm.indexOf('OMA') !== 0) {
+        var num = parseInt(adm.replace('MA', ''), 10);
+        if (!isNaN(num) && num >= maxFound) maxFound = num + 1;
+      }
+    }
+
+    var generatedNumber = Math.max(currentCounterVal, maxFound);
+    admissionNo = prefix + generatedNumber;
+    var nextSettingVal = generatedNumber + 1;
+
+    // Update Setting in DB
+    if (targetSetting) {
+      updateRecord('Settings', targetSetting.id, { value: String(nextSettingVal) }, currentUser.id);
     } else {
-      insertRecord('Counters', { key: counterKey, value: nextVal }, currentUser.id);
+      insertRecord('Settings', {
+        key: settingKey,
+        value: String(nextSettingVal),
+        description: 'Next sequential ' + mode.toLowerCase() + ' admission number'
+      }, currentUser.id);
     }
 
     // 1. Insert Student Record
@@ -72,6 +95,12 @@ function createAdmission(payload, currentUser) {
       professional_email: '',
       course_code: courseCode,
       status: 'LEAD_CONVERTED',
+      assignment_state: 'PENDING',
+      needed_month: '',
+      batch_change_log_json: '[]',
+      outcome_status: 'ACTIVE',
+      outcome_reason: '',
+      outcome_date: '',
       sales_staff_id: salesStaffId,
       batch_id: '',
       total_fee: totalFee,
@@ -138,12 +167,12 @@ function createAdmission(payload, currentUser) {
       recipient_user_id: 'ALL_OPS',
       role_target: 'OPS_EXEC',
       title: 'New Admission Registered: ' + admissionNo,
-      message: fullName + ' enrolled in ' + courseCode + ' (' + mode + '). After-sales call pending.',
+      message: fullName + ' enrolled in ' + courseCode + ' (' + mode + ') by ' + (currentUser.full_name || currentUser.id) + '. After-sales call pending.',
       type: 'ADMISSION',
       is_read: false
     }, currentUser.id);
 
-    logAudit('CREATE_ADMISSION', 'Students', studentId, { admission_no: admissionNo, mode: mode, total_fee: totalFee }, currentUser);
+    logAudit('CREATE_ADMISSION', 'Students', studentId, { admission_no: admissionNo, mode: mode, total_fee: totalFee, sales_staff: salesStaffId }, currentUser);
 
   } finally {
     lock.releaseLock();
@@ -157,7 +186,8 @@ function createAdmission(payload, currentUser) {
       full_name: fullName,
       course_code: courseCode,
       mode: mode,
-      total_fee: totalFee
+      total_fee: totalFee,
+      sales_staff_id: salesStaffId
     }
   };
 }

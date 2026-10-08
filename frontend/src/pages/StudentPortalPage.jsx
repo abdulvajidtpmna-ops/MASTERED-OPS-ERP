@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { Modal } from '../components/common/Modal';
 import { GradeBadge, StatusBadge } from '../components/common/Badge';
 import {
   GraduationCap,
@@ -19,16 +20,25 @@ import {
   Clock,
   Bell,
   Sparkles,
+  ExternalLink,
+  Eye,
+  Building,
+  UserCheck,
 } from 'lucide-react';
 
 export function StudentPortalPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('OVERVIEW'); // OVERVIEW | MODULES | NOTES | FEES | CHAT
   const [summary, setSummary] = useState(null);
+  const [tomorrowClass, setTomorrowClass] = useState(null);
   const [notes, setNotes] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // In-App Document Viewer State (Section 6)
+  const [viewingNote, setViewingNote] = useState(null);
+  const [viewerModalOpen, setViewerModalOpen] = useState(false);
 
   const toast = useToast();
 
@@ -36,12 +46,14 @@ export function StudentPortalPage() {
     async function loadStudentData() {
       try {
         setLoading(true);
-        const [attRes, notesRes, chatRes] = await Promise.all([
+        const [attRes, tomorrowRes, notesRes, chatRes] = await Promise.all([
           apiCall('getAttendanceSummary', { student_id: user?.student_id || 'STU-001' }),
-          apiCall('getAccessibleNotes', { batch_id: 'batch-1' }),
-          apiCall('getBatchChatMessages', { batch_id: 'batch-1' }),
+          apiCall('getStudentTomorrowClass', { student_id: user?.student_id || 'STU-001' }),
+          apiCall('getAccessibleNotes', { batch_id: user?.batch_id || 'batch-1' }),
+          apiCall('getBatchChatMessages', { batch_id: user?.batch_id || 'batch-1' }),
         ]);
         setSummary(attRes);
+        setTomorrowClass(tomorrowRes);
         setNotes(notesRes?.notes || []);
         setChatMessages(chatRes?.messages || []);
       } catch (err) {
@@ -58,19 +70,36 @@ export function StudentPortalPage() {
     if (!newMessage.trim()) return;
     try {
       const msg = await apiCall('sendBatchChatMessage', {
-        batch_id: 'batch-1',
+        batch_id: user?.batch_id || 'batch-1',
         message: newMessage,
       });
-      setChatMessages(prev => [...prev, msg]);
+      setChatMessages((prev) => [...prev, msg]);
       setNewMessage('');
     } catch (err) {
       toast.error('Failed to send message.');
     }
   };
 
+  const handleOpenNoteViewer = (note) => {
+    setViewingNote(note);
+    setViewerModalOpen(true);
+  };
+
   const attPct = summary?.overall_percentage ?? 95.0;
   const isEligible = summary?.is_eligible ?? true;
   const shortfall = summary?.overall_shortfall_hours ?? 0;
+
+  // Build Drive/Doc Embedded Preview Link
+  const getEmbedUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('drive.google.com/file/d/')) {
+      return url.replace('/view', '/preview').replace('/edit', '/preview');
+    }
+    if (url.includes('docs.google.com')) {
+      return url.replace('/edit', '/preview');
+    }
+    return url;
+  };
 
   return (
     <div className="space-y-6">
@@ -79,7 +108,7 @@ export function StudentPortalPage() {
         <div>
           <span className="text-xs font-semibold text-gold-400 uppercase tracking-widest">Candidate Learning Center</span>
           <h1 className="text-2xl font-poppins font-bold mt-0.5">Welcome, {user?.full_name || 'Student'}</h1>
-          <p className="text-xs text-brand-100 mt-1">Admission No: <strong>{user?.username || 'ON-2026-0001'}</strong> • Course: <strong>HR & Corporate Admin</strong></p>
+          <p className="text-xs text-brand-100 mt-1">Admission No: <strong>{user?.username || 'OMA1034'}</strong> • Course: <strong>HR & Corporate Admin</strong></p>
         </div>
         <div className="flex items-center gap-3">
           <GradeBadge grade="A" />
@@ -88,6 +117,52 @@ export function StudentPortalPage() {
           </span>
         </div>
       </div>
+
+      {/* =========================================================================
+          SECTION 5: TOMORROW'S CLASS CARD (STUDENT VIEW)
+          ========================================================================= */}
+      {tomorrowClass?.is_published ? (
+        <div className="p-5 bg-gradient-to-r from-brand-900 via-brand-800 to-brand-700 text-white rounded-2xl border-2 border-gold-400/40 shadow-soft-blue flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 bg-gold-400 text-brand-900 font-black text-xs uppercase tracking-wider rounded-lg">
+                ⚡ Tomorrow's Class Session
+              </span>
+              <span className="text-xs text-brand-200">
+                {tomorrowClass.date} • Slot: <strong>{tomorrowClass.slot}</strong> ({tomorrowClass.hours || 2} hrs)
+              </span>
+            </div>
+            <h3 className="font-poppins font-bold text-lg text-white mt-1">
+              {tomorrowClass.module_code}: {tomorrowClass.module_title}
+            </h3>
+            <p className="text-xs text-brand-100 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-gold-400 shrink-0" />
+              <span>Topic: <strong>{tomorrowClass.topic}</strong></span>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-brand-700/60">
+            <div className="p-2.5 bg-brand-800/80 rounded-xl border border-brand-600/60 text-xs">
+              <span className="text-[10px] text-gray-400 font-semibold uppercase block">Assigned Faculty</span>
+              <strong className="text-gold-300 font-semibold">{tomorrowClass.trainer_name}</strong>
+            </div>
+            <div className="p-2.5 bg-brand-800/80 rounded-xl border border-brand-600/60 text-xs">
+              <span className="text-[10px] text-gray-400 font-semibold uppercase block">Classroom</span>
+              <strong className="text-white font-semibold">🏛️ {tomorrowClass.classroom}</strong>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl flex items-center justify-between text-xs text-gray-600">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-5 h-5 text-gray-400" />
+            <div>
+              <strong className="text-brand-900 block">Tomorrow's Class Schedule:</strong>
+              <span>Not published yet for your batch cohort. Please check back later this evening.</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
@@ -116,7 +191,7 @@ export function StudentPortalPage() {
           }`}
         >
           <FileText className="w-4 h-4 text-gold-400" />
-          Study Materials
+          Study Materials ({notes.length})
         </button>
         <button
           onClick={() => setActiveTab('FEES')}
@@ -206,17 +281,15 @@ export function StudentPortalPage() {
               </div>
             </Card>
 
-            <Card title="Upcoming Timetable Sessions" subtitle="Check schedule for the week ahead">
-              <div className="space-y-2">
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
-                  <div>
-                    <strong className="text-brand-900">M02: Google Workspace for Business</strong>
-                    <p className="text-gray-500">Feb 12, 2026 • 10:00 AM - 12:00 PM • Trainer: Zahadh / Rasheed</p>
-                  </div>
-                  <span className="px-2 py-0.5 bg-blue-50 text-brand-700 font-semibold rounded border border-brand-200">
-                    Virtual Classroom
-                  </span>
+            <Card title="Current Cohort Batch" subtitle="Enrolled batch timing & classroom">
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between text-xs">
+                <div>
+                  <strong className="text-brand-900 font-bold">BH17 (HR & Corporate Administration)</strong>
+                  <p className="text-gray-500">Standard Slot: 10:30 AM • Lead Faculty: Vajid Trainer</p>
                 </div>
+                <span className="px-2 py-0.5 bg-blue-50 text-brand-700 font-semibold rounded border border-brand-200">
+                  Active Cohort
+                </span>
               </div>
             </Card>
           </div>
@@ -267,30 +340,53 @@ export function StudentPortalPage() {
         </Card>
       )}
 
-      {/* 3. STUDY MATERIALS */}
+      {/* =========================================================================
+          SECTION 6: STUDY MATERIALS & IN-APP DOCUMENT VIEWER
+          ========================================================================= */}
       {activeTab === 'NOTES' && (
-        <Card title="Study Materials & Notes" subtitle="Course notes assigned by your trainers">
+        <Card
+          title="Study Materials & Module Notes"
+          subtitle="Open documents inside the app viewer or download directly to your device"
+        >
           <div className="space-y-3">
             {notes.map((n) => (
-              <div key={n.id} className="p-4 rounded-xl border border-gray-200 bg-white flex items-center justify-between">
+              <div key={n.id} className="p-4 rounded-xl border border-gray-200 bg-white flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <FileText className="w-6 h-6 text-brand-700 shrink-0" />
+                  <FileText className="w-8 h-8 text-brand-700 shrink-0" />
                   <div>
                     <span className="font-mono text-xs font-bold text-brand-500">{n.module_code}</span>
-                    <h5 className="font-semibold text-xs text-brand-900">{n.title}</h5>
-                    <p className="text-[10px] text-gray-500">Format: {n.file_type || 'PDF'}</p>
+                    <h5 className="font-bold text-xs text-brand-900">{n.title}</h5>
+                    <p className="text-[11px] text-gray-500">Format: {n.file_type || 'PDF'}</p>
+                    {n.description && <p className="text-[11px] text-gray-600 mt-0.5">{n.description}</p>}
                   </div>
                 </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={Download}
-                  onClick={() => window.open(n.file_url, '_blank')}
-                >
-                  Download Note
-                </Button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Eye}
+                    onClick={() => handleOpenNoteViewer(n)}
+                  >
+                    Open Inside App
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={Download}
+                    onClick={() => window.open(n.file_url, '_blank')}
+                  >
+                    Download
+                  </Button>
+                </div>
               </div>
             ))}
+
+            {notes.length === 0 && (
+              <div className="py-8 text-center text-gray-400 italic">
+                No study materials assigned to your cohort yet.
+              </div>
+            )}
           </div>
         </Card>
       )}
@@ -399,6 +495,53 @@ export function StudentPortalPage() {
           </div>
         </Card>
       )}
+
+      {/* =========================================================================
+          IN-APP DOCUMENT VIEWER MODAL (SECTION 6)
+          ========================================================================= */}
+      <Modal
+        isOpen={viewerModalOpen}
+        onClose={() => setViewerModalOpen(false)}
+        title={viewingNote?.title || 'Study Material Viewer'}
+        subtitle={`Module: ${viewingNote?.module_code} • Format: ${viewingNote?.file_type || 'PDF'}`}
+        maxWidth="max-w-4xl"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-2 bg-gray-50 rounded-xl border border-gray-200 text-xs">
+            <span className="text-gray-600 font-medium truncate max-w-md">
+              {viewingNote?.file_url}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={ExternalLink}
+                onClick={() => window.open(viewingNote?.file_url, '_blank')}
+              >
+                Open in New Tab
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Download}
+                onClick={() => window.open(viewingNote?.file_url, '_blank')}
+              >
+                Download File
+              </Button>
+            </div>
+          </div>
+
+          {/* Embedded Viewer iFrame */}
+          <div className="w-full h-[520px] bg-gray-100 rounded-2xl overflow-hidden border border-gray-300 relative shadow-inner">
+            <iframe
+              src={getEmbedUrl(viewingNote?.file_url)}
+              title="In-App Document Viewer"
+              className="w-full h-full border-none"
+              allow="autoplay"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

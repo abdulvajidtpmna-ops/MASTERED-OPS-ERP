@@ -58,11 +58,11 @@ function executeMockAction(action, payload, token) {
 
       if (login_type === 'STUDENT') {
         const cleanMobile = (identifier || '').replace(/\D/g, '').slice(-10);
-        user = db.users.find(u => u.role === 'STUDENT' && (u.mobile.slice(-10) === cleanMobile || u.username.toUpperCase() === (secret || '').toUpperCase()));
+        user = db.users.find(u => u.role === 'STUDENT' && (u.mobile?.slice(-10) === cleanMobile || u.username?.toUpperCase() === (secret || '').toUpperCase()));
       } else if (login_type === 'TRAINER') {
-        user = db.users.find(u => u.role === 'TRAINER' && u.email.toLowerCase() === (identifier || '').toLowerCase());
+        user = db.users.find(u => u.role === 'TRAINER' && u.email?.toLowerCase() === (identifier || '').toLowerCase());
       } else {
-        user = db.users.find(u => u.role !== 'STUDENT' && u.email.toLowerCase() === (identifier || '').toLowerCase());
+        user = db.users.find(u => u.role !== 'STUDENT' && u.email?.toLowerCase() === (identifier || '').toLowerCase());
       }
 
       if (!user) {
@@ -86,11 +86,28 @@ function executeMockAction(action, payload, token) {
     }
 
     case 'createAdmission': {
-      const mode = payload.mode || 'ONLINE';
-      const year = new Date().getFullYear();
-      const count = db.students.filter(s => s.mode === mode).length + 1;
-      const prefix = mode === 'ONLINE' ? 'ON-' : 'OF-';
-      const admissionNo = `${prefix}${year}-${('0000' + count).slice(-4)}`;
+      const mode = (payload.mode || 'ONLINE').toUpperCase();
+      const prefix = mode === 'ONLINE' ? 'OMA' : 'MA';
+      const settingKey = mode === 'ONLINE' ? 'next_online_no' : 'next_offline_no';
+      const defaultStart = mode === 'ONLINE' ? 1034 : 2017;
+
+      let currentNo = parseInt(db.settings[settingKey], 10) || defaultStart;
+
+      // Check max existing
+      db.students.forEach(st => {
+        const adm = st.admission_no || '';
+        if (mode === 'ONLINE' && adm.startsWith('OMA')) {
+          const n = parseInt(adm.replace('OMA', ''), 10);
+          if (n >= currentNo) currentNo = n + 1;
+        } else if (mode === 'OFFLINE' && adm.startsWith('MA') && !adm.startsWith('OMA')) {
+          const n = parseInt(adm.replace('MA', ''), 10);
+          if (n >= currentNo) currentNo = n + 1;
+        }
+      });
+
+      const admissionNo = `${prefix}${currentNo}`;
+      db.settings[settingKey] = String(currentNo + 1);
+
       const studentId = 'STU-' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
       const newStudent = {
@@ -100,11 +117,17 @@ function executeMockAction(action, payload, token) {
         mode: mode,
         full_name: payload.full_name,
         mobile: payload.mobile,
-        personal_email: payload.personal_email,
+        personal_email: payload.personal_email || '',
         professional_email: '',
         course_code: payload.course_code || 'HRCA',
         status: 'LEAD_CONVERTED',
-        sales_staff_id: currentUser.staff_id || 'ST-01',
+        assignment_state: 'PENDING',
+        needed_month: '',
+        batch_change_log_json: '[]',
+        outcome_status: 'ACTIVE',
+        outcome_reason: '',
+        outcome_date: '',
+        sales_staff_id: currentUser.staff_id || currentUser.id || 'ST-01',
         batch_id: '',
         total_fee: Number(payload.total_fee) || (payload.course_code === 'BHA' ? 35000 : 25000),
         joined_date: new Date().toISOString().substring(0, 10),
@@ -135,29 +158,125 @@ function executeMockAction(action, payload, token) {
         paid_amount: 0
       });
 
-      // After-sales task
-      db.duties.push({
-        id: 'dut-' + Date.now(),
-        assignee_id: 'usr-3',
-        date: new Date().toISOString().substring(0, 10),
-        title: `After-sales call: ${payload.full_name} (${admissionNo})`,
-        status: 'PENDING',
-        requires_evidence: false
-      });
-
       db.students.unshift(newStudent);
       saveMockDb(db);
       return newStudent;
     }
 
-    case 'logAfterSalesCall': {
-      const { student_id, outcome, preferred_batch, notes } = payload;
-      const student = db.students.find(s => s.student_id === student_id);
-      if (student && outcome === 'DROPPED') {
-        student.status = 'DROPPED';
+    // Section 1: Batches
+    case 'createBatch': {
+      const rawName = String(payload.name || payload.batch_code || '').trim().toUpperCase();
+      const slot = String(payload.slot || '').trim();
+      const startDate = String(payload.start_date || '').trim();
+
+      if (!/^BH\d+$/.test(rawName)) {
+        throw new Error("Batch name must strictly follow the format 'BH' + number (e.g. BH17, BH19, BH20).");
       }
+
+      if (db.batches.some(b => b.name === rawName || b.batch_code === rawName)) {
+        throw new Error(`A batch named '${rawName}' already exists.`);
+      }
+
+      if (!['8:30 AM', '10:30 AM', '12:30 PM'].includes(slot)) {
+        throw new Error("Invalid time slot. Must be '8:30 AM', '10:30 AM', or '12:30 PM'.");
+      }
+
+      const newBatch = {
+        id: 'batch-' + Date.now(),
+        batch_code: rawName,
+        name: rawName,
+        slot,
+        start_date: startDate,
+        original_start_date: startDate,
+        start_date_history_json: '[]',
+        end_date: '',
+        mode: payload.mode || 'ONLINE',
+        course_code: payload.course_code || 'HRCA',
+        status: 'PLANNED',
+        default_trainer_id: payload.default_trainer_id || 'TR-101'
+      };
+
+      db.batches.push(newBatch);
       saveMockDb(db);
-      return { student_id, outcome, notes, success: true };
+      return newBatch;
+    }
+
+    case 'postponeBatchStartDate': {
+      const { batch_id, new_start_date, reason } = payload;
+      const batch = db.batches.find(b => b.id === batch_id);
+      if (!batch) throw new Error('Batch not found');
+
+      // Check held classes
+      const hasHeldClasses = db.sessions.some(s => s.batch_id === batch_id && s.status === 'DONE');
+      if (hasHeldClasses && currentUser.role !== 'MAIN_ADMIN') {
+        throw new Error('Cannot postpone start date: this batch already has classes marked as held.');
+      }
+
+      let history = [];
+      try {
+        history = JSON.parse(batch.start_date_history_json || '[]');
+      } catch (e) {
+        history = [];
+      }
+
+      history.push({
+        old_date: batch.start_date,
+        new_date: new_start_date,
+        reason: reason || '',
+        by: currentUser.full_name || currentUser.id,
+        when: new Date().toISOString()
+      });
+
+      batch.start_date = new_start_date;
+      batch.start_date_history_json = JSON.stringify(history);
+      saveMockDb(db);
+      return batch;
+    }
+
+    case 'updateBatch': {
+      const batch = db.batches.find(b => b.id === payload.batch_id);
+      if (!batch) throw new Error('Batch not found');
+      if (payload.name) batch.name = payload.name;
+      if (payload.slot) batch.slot = payload.slot;
+      if (payload.default_trainer_id) batch.default_trainer_id = payload.default_trainer_id;
+      saveMockDb(db);
+      return batch;
+    }
+
+    // Section 3: After Sales
+    case 'getAfterSalesData': {
+      const userMap = {};
+      db.users.forEach(u => { userMap[u.id] = u.full_name; if (u.staff_id) userMap[u.staff_id] = u.full_name; });
+
+      const batchSeatsMap = {};
+      db.batches.forEach(b => {
+        batchSeatsMap[b.id] = db.students.filter(s => s.batch_id === b.id).length;
+      });
+
+      const pending = [];
+      const deferred = [];
+      const assigned = [];
+
+      db.students.filter(s => s.status !== 'DROPPED').forEach(s => {
+        const item = {
+          ...s,
+          sales_person_name: userMap[s.sales_staff_id] || s.sales_staff_id || 'Direct / Online'
+        };
+        if (item.assignment_state === 'DEFERRED') {
+          deferred.push(item);
+        } else if (item.assignment_state === 'ASSIGNED' && item.batch_id) {
+          assigned.push(item);
+        } else {
+          pending.push(item);
+        }
+      });
+
+      const enhancedBatches = db.batches.map(b => ({
+        ...b,
+        seats_assigned: batchSeatsMap[b.id] || 0
+      }));
+
+      return { pending, deferred, assigned, batches: enhancedBatches };
     }
 
     case 'assignBatch': {
@@ -165,10 +284,61 @@ function executeMockAction(action, payload, token) {
       const student = db.students.find(s => s.student_id === student_id);
       if (student) {
         student.batch_id = batch_id;
+        student.assignment_state = 'ASSIGNED';
         student.status = 'ASSIGNED';
       }
       saveMockDb(db);
       return { student_id, batch_id, status: 'ASSIGNED' };
+    }
+
+    case 'deferStudent': {
+      const { student_id, needed_month, reason } = payload;
+      const student = db.students.find(s => s.student_id === student_id);
+      if (student) {
+        student.assignment_state = 'DEFERRED';
+        student.needed_month = needed_month;
+        student.batch_id = '';
+      }
+      saveMockDb(db);
+      return { student_id, assignment_state: 'DEFERRED', needed_month };
+    }
+
+    case 'changeStudentBatch': {
+      const { student_id, new_batch_id, reason } = payload;
+      const student = db.students.find(s => s.student_id === student_id);
+      if (!student) throw new Error('Student not found');
+
+      let logs = [];
+      try {
+        logs = JSON.parse(student.batch_change_log_json || '[]');
+      } catch (e) {
+        logs = [];
+      }
+
+      logs.push({
+        old_batch_id: student.batch_id,
+        new_batch_id,
+        reason,
+        by: currentUser.full_name || currentUser.id,
+        when: new Date().toISOString()
+      });
+
+      student.batch_id = new_batch_id;
+      student.assignment_state = 'ASSIGNED';
+      student.batch_change_log_json = JSON.stringify(logs);
+      saveMockDb(db);
+      return { student_id, batch_id: new_batch_id, assignment_state: 'ASSIGNED' };
+    }
+
+    case 'logAfterSalesCall': {
+      const { student_id, outcome, preferred_batch, notes } = payload;
+      const student = db.students.find(s => s.student_id === student_id);
+      if (student && outcome === 'DROPPED') {
+        student.status = 'DROPPED';
+        student.assignment_state = 'DROPPED';
+      }
+      saveMockDb(db);
+      return { student_id, outcome, notes, success: true };
     }
 
     case 'startBatch': {
@@ -178,634 +348,474 @@ function executeMockAction(action, payload, token) {
         batch.status = 'ACTIVE';
         batch.start_date = start_date || new Date().toISOString().substring(0, 10);
       }
-
-      const assignedStudents = db.students.filter(s => s.batch_id === batch_id);
-      const startDate = new Date(batch.start_date);
-
-      assignedStudents.forEach(st => {
-        st.status = 'ACTIVE';
-        const total = Number(st.total_fee) || 25000;
-        const remaining = total - 500 - 2450;
-        const base = Math.floor(remaining / 4);
-        const rem = remaining - (base * 4);
-
-        // Balance Reg
-        db.installments.push({
-          id: 'inst-' + Math.random(),
-          student_id: st.student_id,
-          installment_no: 0.5,
-          title: 'Balance Registration Fee',
-          due_date: batch.start_date,
-          amount: 2450,
-          status: 'UNPAID',
-          paid_amount: 0
-        });
-
-        // 4 Installments
-        [7, 37, 67, 97].forEach((days, idx) => {
-          const d = new Date(startDate.getTime() + days * 86400000).toISOString().substring(0, 10);
-          db.installments.push({
-            id: 'inst-' + Math.random(),
-            student_id: st.student_id,
-            installment_no: idx + 1,
-            title: `${idx + 1}${idx === 0 ? 'st' : idx === 1 ? 'nd' : idx === 2 ? 'rd' : 'th'} Course Installment`,
-            due_date: d,
-            amount: idx === 3 ? (base + rem) : base,
-            status: 'UNPAID',
-            paid_amount: 0
-          });
-        });
-      });
-
       saveMockDb(db);
-      return { batch_id, activated: assignedStudents.length };
-    }
-
-    case 'createClassSession': {
-      const session = {
-        id: 'ses-' + Date.now(),
-        session_id: 'SES-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-        batch_id: payload.batch_id,
-        module_code: payload.module_code,
-        date: payload.date,
-        start_time: payload.start_time || '10:00',
-        end_time: payload.end_time || '12:00',
-        hours: Number(payload.hours) || 2,
-        audience: payload.audience || 'ALL',
-        status: payload.status || 'PLANNED',
-        topics_covered_note: payload.topics_covered_note || ''
-      };
-      db.sessions.push(session);
-      saveMockDb(db);
-      return session;
-    }
-
-    case 'bulkSaveDailyTimetable': {
-      const { date, entries } = payload;
-      const saved = [];
-      (entries || []).forEach(e => {
-        if (e.is_active === false) return;
-        let s = db.sessions.find(item => item.batch_id === e.batch_id && item.date === date);
-        if (s) {
-          s.module_code = e.module_code || 'M01';
-          s.trainer_id = e.trainer_id || 'TR-101';
-          s.start_time = e.start_time || '10:00';
-          s.end_time = e.end_time || '12:00';
-          s.hours = Number(e.hours) || 2;
-          s.audience = e.audience || 'ALL';
-          s.topics_covered_note = e.topics_covered_note || '';
-          saved.push(s);
-        } else {
-          const newSess = {
-            id: 'ses-' + Date.now() + Math.random().toString(36).substring(2, 5),
-            session_id: 'SES-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-            batch_id: e.batch_id,
-            module_code: e.module_code || 'M01',
-            trainer_id: e.trainer_id || 'TR-101',
-            date: date,
-            start_time: e.start_time || '10:00',
-            end_time: e.end_time || '12:00',
-            hours: Number(e.hours) || 2,
-            audience: e.audience || 'ALL',
-            status: 'PLANNED',
-            topics_covered_note: e.topics_covered_note || ''
-          };
-          db.sessions.push(newSess);
-          saved.push(newSess);
-        }
-      });
-      saveMockDb(db);
-      return { count: saved.length, date, items: saved };
+      return { batch_id, activated: 2 };
     }
 
     case 'getBatchesList': {
       return db.batches;
     }
 
-    case 'markAttendance': {
-      const { session_id, rows, topics_covered_note } = payload;
-      const sess = db.sessions.find(s => s.session_id === session_id || s.id === session_id);
-      if (sess) {
-        sess.status = 'DONE';
-        if (topics_covered_note) sess.topics_covered_note = topics_covered_note;
-      }
+    // Section 4: Timetable
+    case 'getTimetableForDate': {
+      const date = payload.date || new Date(Date.now() + 86400000).toISOString().substring(0, 10);
+      const rooms = ['IT Tech Lab', 'Success Room', 'Future CEO', 'Growth Room', 'Idea Room', 'BSchool'];
+      const slots = ['8:30 AM', '10:30 AM', '12:30 PM'];
 
-      rows.forEach(r => {
-        const exist = db.attendance.find(a => (a.session_id === session_id || a.session_id === sess?.session_id) && a.student_id === r.student_id);
-        if (exist) {
-          exist.status = r.status;
-          exist.marked_at = new Date().toISOString();
-        } else {
-          db.attendance.push({
-            id: 'att-' + Math.random(),
-            session_id: sess ? sess.session_id : session_id,
-            student_id: r.student_id,
-            status: r.status,
-            marked_at: new Date().toISOString()
-          });
-        }
-      });
-
-      saveMockDb(db);
-      return { marked_count: rows.length };
-    }
-
-    case 'getAttendanceSummary': {
-      const studentId = payload.student_id || currentUser.student_id || 'STU-001';
-      const student = db.students.find(s => s.student_id === studentId) || db.students[0];
-      const isBHA = student.course_code === 'BHA';
-
-      const doneSessions = db.sessions.filter(s => s.status === 'DONE' && (s.audience !== 'BHA_ONLY' || isBHA));
-      const stuAttendance = db.attendance.filter(a => a.student_id === student.student_id);
-
-      let totalConducted = 0;
-      let totalAttended = 0;
-      let allPass85 = true;
-
-      const modMap = {};
-      db.modules.filter(m => isBHA || m.course === 'HRCA').forEach(m => {
-        modMap[m.code] = { module_code: m.code, title: m.title, conducted_hours: 0, attended_hours: 0, percentage: 100, shortfall_hours: 0, eligible: true };
-      });
-
-      doneSessions.forEach(sess => {
-        const h = Number(sess.hours) || 2;
-        totalConducted += h;
-        if (modMap[sess.module_code]) modMap[sess.module_code].conducted_hours += h;
-
-        const att = stuAttendance.find(a => a.session_id === sess.session_id);
-        if (att && (att.status === 'P' || att.status === 'L' || att.status === 'EXCUSED')) {
-          totalAttended += h;
-          if (modMap[sess.module_code]) modMap[sess.module_code].attended_hours += h;
-        }
-      });
-
-      const modulesList = Object.values(modMap).map(m => {
-        if (m.conducted_hours > 0) {
-          m.percentage = Number(((m.attended_hours / m.conducted_hours) * 100).toFixed(1));
-          const req = Math.ceil(m.conducted_hours * 0.85);
-          if (m.attended_hours < req) {
-            m.shortfall_hours = req - m.attended_hours;
-            m.eligible = false;
-            allPass85 = false;
-          }
-        }
-        return m;
-      });
-
-      const overallPct = totalConducted > 0 ? Number(((totalAttended / totalConducted) * 100).toFixed(1)) : 100;
-      const overallReq = Math.ceil(totalConducted * 0.85);
-      const overallShortfall = totalAttended < overallReq ? (overallReq - totalAttended) : 0;
-
-      return {
-        student_id: student.student_id,
-        admission_no: student.admission_no,
-        full_name: student.full_name,
-        course_code: student.course_code,
-        total_conducted_hours: totalConducted,
-        total_attended_hours: totalAttended,
-        overall_percentage: overallPct,
-        overall_shortfall_hours: overallShortfall,
-        is_eligible: overallPct >= 85 && allPass85,
-        modules: modulesList
-      };
-    }
-
-    case 'getAttendanceOverview': {
-      const allStudents = db.students.filter(s => s.status !== 'DROPPED');
-      const allBatches = db.batches;
-      const allSessions = db.sessions;
-      const allAtt = db.attendance;
-
-      const batchStats = allBatches.map(b => {
-        const bStudents = allStudents.filter(s => s.batch_id === b.id);
-        const bSessions = allSessions.filter(s => s.batch_id === b.id && s.status === 'DONE');
-        const totalPossibilities = bStudents.length * (bSessions.length || 1);
-        let presentCount = 0;
-        let eligibleCount = 0;
-
-        bStudents.forEach(st => {
-          const stAtt = allAtt.filter(a => a.student_id === st.student_id && (a.status === 'P' || a.status === 'L' || a.status === 'EXCUSED'));
-          presentCount += stAtt.length;
-          const pct = bSessions.length > 0 ? (stAtt.length / bSessions.length) * 100 : 100;
-          if (pct >= 85) eligibleCount++;
-        });
-
-        const batchPct = bSessions.length > 0 ? Number(((presentCount / totalPossibilities) * 100).toFixed(1)) : 94.5;
-
+      const grid = db.batches.map(b => {
+        const existing = (db.timetable || []).find(t => t.batch_id === b.id && t.date === date);
         return {
           batch_id: b.id,
           batch_code: b.batch_code,
-          name: b.name,
-          status: b.status,
-          total_students: bStudents.length,
-          conducted_sessions: bSessions.length,
-          average_attendance_pct: batchPct,
-          eligible_students: eligibleCount,
-          low_attendance_count: Math.max(0, bStudents.length - eligibleCount)
+          batch_name: b.name,
+          batch_status: b.status,
+          course_code: b.course_code,
+          mode: b.mode,
+          date,
+          slot: existing?.slot || b.slot || '10:30 AM',
+          module_code: existing?.module_code || (b.course_code === 'BHA' ? 'HA1' : 'M01'),
+          topic_id: existing?.topic_id || 'Interactive Discussion & Workshop',
+          trainer_id: existing?.trainer_id || b.default_trainer_id || 'TR-101',
+          room: existing?.room || 'IT Tech Lab',
+          is_locked: false,
+          can_edit: true,
+          lock_reason: '',
+          topics_covered_note: existing?.topic_id || ''
         };
       });
 
-      const totalEnrolled = allStudents.length;
-      const totalEligible = batchStats.reduce((sum, b) => sum + b.eligible_students, 0);
+      return { date, lock_hours: 24, rooms, slots, grid, warnings: [] };
+    }
+
+    case 'bulkSaveTimetableGrid': {
+      const { date, entries } = payload;
+      if (!db.timetable) db.timetable = [];
+
+      (entries || []).forEach(e => {
+        const idx = db.timetable.findIndex(t => t.batch_id === e.batch_id && t.date === date);
+        const item = {
+          id: 'tt-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          batch_id: e.batch_id,
+          date: date,
+          slot: e.slot,
+          module_code: e.module_code,
+          topic_id: e.topic_id,
+          trainer_id: e.trainer_id,
+          room: e.room,
+          locked: false
+        };
+        if (idx !== -1) {
+          db.timetable[idx] = item;
+        } else {
+          db.timetable.push(item);
+        }
+      });
+
+      saveMockDb(db);
+      return { saved_count: (entries || []).length, errors: [], warnings: [] };
+    }
+
+    // Section 5: Student Tomorrow Class
+    case 'getStudentTomorrowClass': {
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().substring(0, 10);
+      const student = db.students.find(s => s.student_id === payload.student_id) || db.students[0];
+      const entry = (db.timetable || []).find(t => t.batch_id === student?.batch_id && t.date === tomorrow) || {
+        slot: '10:30 AM',
+        module_code: 'M02',
+        topic_id: 'AI Workplace Prompts & Automation Case Studies',
+        trainer_id: 'TR-101',
+        room: 'IT Tech Lab'
+      };
 
       return {
-        overall_institute_pct: 92.4,
-        total_enrolled: totalEnrolled,
-        total_eligible: totalEligible || 2,
-        eligible_percentage: totalEnrolled > 0 ? Number(((totalEligible / totalEnrolled) * 100).toFixed(1)) : 88.0,
-        today_present_count: 24,
-        today_absent_count: 2,
-        today_late_count: 1,
-        batches: batchStats
+        date: tomorrow,
+        is_published: true,
+        slot: entry.slot || '10:30 AM',
+        module_code: entry.module_code || 'M02',
+        module_title: 'Business Technology Skills & Gen AI',
+        topic: entry.topic_id || 'AI Workplace Prompts & Automation Case Studies',
+        trainer_id: entry.trainer_id || 'TR-101',
+        trainer_name: 'Vajid Trainer (Lead Corporate & AI)',
+        classroom: entry.room || 'IT Tech Lab',
+        hours: 2
       };
     }
 
-    case 'saveAssessment': {
-      const { student_id, batch_id, module_code, type, score, absent } = payload;
-      let ass = db.assessments.find(a => a.student_id === student_id && a.module_code === module_code && a.type === type);
-      if (ass) {
-        ass.score = absent ? 0 : Number(score);
-        ass.absent = !!absent;
+    // Section 4: Main Admin Topics Covered Report
+    case 'getTopicsCoveredReport': {
+      const reports = db.batches.map(b => {
+        const coveredCount = b.id === 'batch-1' ? 4 : 0;
+        const totalPlanned = b.course_code === 'BHA' ? 45 : 30;
+        const coveredHours = coveredCount * 2;
+        const totalHours = b.course_code === 'BHA' ? 90 : 60;
+        return {
+          batch_id: b.id,
+          batch_code: b.batch_code,
+          batch_name: b.name,
+          slot: b.slot || '10:30 AM',
+          course_code: b.course_code,
+          start_date: b.start_date,
+          status: b.status,
+          planned_hours: totalHours,
+          covered_hours: coveredHours,
+          planned_topics: totalPlanned,
+          covered_topics_count: coveredCount,
+          progress_pct: Math.round((coveredHours / totalHours) * 100),
+          last_session: coveredCount > 0 ? {
+            date: '2026-02-08',
+            time: '10:00 - 12:00',
+            module_code: 'M02',
+            topic: 'Gen AI for Business & Administration (M02)',
+            trainer_name: 'Vajid Trainer'
+          } : null,
+          covered_sessions: [
+            { session_id: 'ses-1', date: '2026-02-05', time: '10:00 - 12:00', module_code: 'M01', topic: 'Ice Breaking & Public Speaking', trainer_name: 'Vajid Trainer', hours: 2 },
+            { session_id: 'ses-2', date: '2026-02-06', time: '10:00 - 12:00', module_code: 'M01', topic: 'Gen AI & Career Clarity', trainer_name: 'Vajid Trainer', hours: 2 },
+            { session_id: 'ses-3', date: '2026-02-07', time: '10:00 - 12:00', module_code: 'M02', topic: 'Google Workspace for Business', trainer_name: 'Rasheed', hours: 2 },
+            { session_id: 'ses-4', date: '2026-02-08', time: '10:00 - 12:00', module_code: 'M02', topic: 'Gen AI for Business & Administration', trainer_name: 'Vajid Trainer', hours: 2 }
+          ]
+        };
+      });
+      return { total_batches: db.batches.length, reports };
+    }
+
+    // Section 7: Sales Daily Counts
+    case 'saveSalesDailyCounts': {
+      if (!db.salesDailyCounts) db.salesDailyCounts = [];
+      const staffId = payload.staff_id || currentUser.staff_id || 'ST-01';
+      const date = payload.date || new Date().toISOString().substring(0, 10);
+
+      const idx = db.salesDailyCounts.findIndex(c => c.staff_id === staffId && c.date === date);
+      const item = {
+        id: 'sdc-' + Date.now(),
+        staff_id: staffId,
+        date: date,
+        leads: Number(payload.leads) || 0,
+        qualified: Number(payload.qualified) || 0,
+        interested: Number(payload.interested) || 0,
+        bucket_new: Number(payload.bucket_new) || 0,
+        bucket_lost: Number(payload.bucket_lost) || 0
+      };
+
+      if (idx !== -1) {
+        db.salesDailyCounts[idx] = item;
       } else {
-        db.assessments.push({
-          id: 'ass-' + Date.now(),
-          student_id,
-          batch_id,
-          module_code,
-          type,
-          score: absent ? 0 : Number(score),
-          max_score: 100,
-          absent: !!absent
-        });
+        db.salesDailyCounts.unshift(item);
       }
       saveMockDb(db);
-      return { success: true };
+      return item;
+    }
+
+    case 'getSalesDailyCounts': {
+      const counts = db.salesDailyCounts || [];
+      const totalLeads = counts.reduce((sum, c) => sum + (Number(c.leads) || 0), 0);
+      const totalQualified = counts.reduce((sum, c) => sum + (Number(c.qualified) || 0), 0);
+      const totalInterested = counts.reduce((sum, c) => sum + (Number(c.interested) || 0), 0);
+      const totalBucketNew = counts.reduce((sum, c) => sum + (Number(c.bucket_new) || 0), 0);
+      const totalBucketLost = counts.reduce((sum, c) => sum + (Number(c.bucket_lost) || 0), 0);
+
+      const sorted = counts.slice().sort((a, b) => (Number(b.bucket_lost) || 0) - (Number(a.bucket_lost) || 0));
+
+      return {
+        staff_id: payload.staff_id || 'ST-01',
+        staff_list: [
+          { id: 'usr-9', staff_id: 'ST-01', full_name: 'Ajeesha M', email: 'sales1@mastered.in' },
+          { id: 'usr-8', staff_id: 'ST-02', full_name: 'Farhan A (Sales Head)', email: 'saleshead@mastered.in' }
+        ],
+        summary: {
+          total_leads: totalLeads,
+          total_qualified: totalQualified,
+          total_interested: totalInterested,
+          total_bucket_new: totalBucketNew,
+          total_bucket_lost: totalBucketLost,
+          current_bucket_balance: totalBucketNew - totalBucketLost
+        },
+        entries: sorted
+      };
+    }
+
+    // Section 8: Sales Incentives
+    case 'getMyIncentives': {
+      const month = payload.month || '2026-02';
+      const staffId = payload.staff_id || currentUser.staff_id || 'ST-01';
+
+      const myStudents = db.students.filter(s => s.sales_staff_id === staffId || staffId === 'ALL');
+      const myStudentIds = new Set(myStudents.map(s => s.student_id));
+
+      const monthPayments = (db.payments || []).filter(p => myStudentIds.has(p.student_id) && (p.paid_month === month || p.payment_date?.startsWith(month)));
+      const collectionsTotal = monthPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const grossIncentive = Math.round(collectionsTotal * 0.1);
+
+      const droppedWithout = myStudents.filter(s => s.outcome_status === 'DROPPED_WITHOUT_CAME' && (s.outcome_date?.startsWith(month) || s.joined_date?.startsWith(month)));
+      const deductions = droppedWithout.length * 250;
+      const net = grossIncentive - deductions;
+
+      const paymentRecords = monthPayments.map(p => {
+        const student = myStudents.find(s => s.student_id === p.student_id);
+        const amt = Number(p.amount) || 0;
+        return {
+          payment_id: p.id,
+          student_id: p.student_id,
+          student_name: student ? student.full_name : 'Student',
+          admission_no: student ? student.admission_no : '',
+          amount: amt,
+          due_month: p.due_month || month,
+          paid_month: p.paid_month || month,
+          payment_mode: p.payment_mode,
+          receipt_no: p.receipt_no,
+          incentive_amount: Math.round(amt * 0.1)
+        };
+      });
+
+      return {
+        staff_id: staffId,
+        month,
+        summary: {
+          collections_total: collectionsTotal,
+          incentive_rate_pct: 10,
+          gross_incentive: grossIncentive,
+          dropped_without_came_count: droppedWithout.length,
+          drop_penalty_per_student: 250,
+          total_deductions: deductions,
+          net_incentive: net
+        },
+        payments: paymentRecords,
+        students: myStudents
+      };
+    }
+
+    case 'setStudentOutcomeStatus': {
+      const { student_id, outcome_status, reason, outcome_date } = payload;
+      const student = db.students.find(s => s.student_id === student_id);
+      if (!student) throw new Error('Student not found');
+
+      if (outcome_status === 'DROPPED_WITHOUT_CAME') {
+        const hasAttendance = (db.attendance || []).some(a => a.student_id === student_id && ['P', 'L', 'EXCUSED'].includes(a.status));
+        if (hasAttendance) {
+          throw new Error("Validation Error: Student has attended classes. 'DROPPED_WITHOUT_CAME' is not permitted. Please select 'DROPPED_AFTER_CAME'.");
+        }
+      }
+
+      student.outcome_status = outcome_status;
+      student.outcome_reason = reason || '';
+      student.outcome_date = outcome_date || new Date().toISOString().substring(0, 10);
+      if (['DROPPED_AFTER_CAME', 'DROPPED_WITHOUT_CAME'].includes(outcome_status)) {
+        student.status = 'DROPPED';
+        student.assignment_state = 'DROPPED';
+      } else if (outcome_status === 'COMPLETED') {
+        student.status = 'COMPLETED';
+      } else {
+        student.status = 'ACTIVE';
+      }
+
+      saveMockDb(db);
+      return student;
     }
 
     case 'recordPayment': {
       const { student_id, installment_id, amount, payment_mode, reference_no, remarks } = payload;
-      const inst = db.installments.find(i => i.id === installment_id);
       const receiptNo = 'REC-2026-' + Math.floor(10000 + Math.random() * 90000);
+      const nowIso = new Date().toISOString();
+      const currentMonth = nowIso.substring(0, 7);
 
-      if (inst) {
-        inst.paid_amount = (Number(inst.paid_amount) || 0) + Number(amount);
-        inst.status = inst.paid_amount >= inst.amount ? 'PAID' : 'PARTIAL';
-        inst.paid_date = new Date().toISOString().substring(0, 10);
-      }
+      const student = db.students.find(s => s.student_id === student_id);
+      const installment = db.installments.find(i => i.id === installment_id);
 
-      const pay = {
+      const payment = {
         id: 'pay-' + Date.now(),
         student_id,
         installment_id,
         amount: Number(amount),
+        due_month: installment?.due_date ? String(installment.due_date).substring(0, 7) : currentMonth,
+        paid_month: currentMonth,
+        sales_staff_id: student?.sales_staff_id || 'ST-01',
         payment_mode: payment_mode || 'UPI',
-        reference_no: reference_no || receiptNo,
-        payment_date: new Date().toISOString(),
+        reference_no: reference_no || 'REF-' + Date.now(),
+        payment_date: nowIso,
         receipt_no: receiptNo,
         remarks: remarks || ''
       };
 
-      db.payments.push(pay);
+      if (!db.payments) db.payments = [];
+      db.payments.push(payment);
+
+      if (installment) {
+        installment.paid_amount = (Number(installment.paid_amount) || 0) + Number(amount);
+        installment.status = (installment.paid_amount >= installment.amount) ? 'PAID' : 'PARTIAL';
+        installment.paid_date = nowIso;
+      }
+
       saveMockDb(db);
-      return { payment: pay, receipt_no: receiptNo };
+      return { payment, receipt_no: receiptNo, installment_status: installment?.status || 'PAID', paid_amount: installment?.paid_amount || amount };
     }
 
-    case 'getFeeAnalytics': {
-      let totalCollected = db.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-      let totalPending = 0;
-      let totalOverdue = 0;
-      let next7Days = 0;
-
-      const now = new Date();
-      const todayStr = now.toISOString().substring(0, 10);
-      const in7Str = new Date(now.getTime() + 7 * 86400000).toISOString().substring(0, 10);
-
-      db.installments.forEach(i => {
-        const bal = (Number(i.amount) || 0) - (Number(i.paid_amount) || 0);
-        if (bal > 0) {
-          totalPending += bal;
-          if (i.due_date < todayStr) totalOverdue += bal;
-          else if (i.due_date <= in7Str) next7Days += bal;
-        }
-      });
-
+    case 'getAttendanceSummary': {
       return {
-        total_collected: totalCollected,
-        total_pending: totalPending,
-        total_overdue: totalOverdue,
-        next_7_days_due: next7Days,
-        batch_breakdown: db.batches.map(b => ({
+        overall_percentage: 95.0,
+        overall_shortfall_hours: 0,
+        is_eligible: true,
+        modules: [
+          { module_code: 'M01', title: 'Future Career Foundation', conducted_hours: 6, attended_hours: 6, percentage: 100, eligible: true },
+          { module_code: 'M02', title: 'Business Technology Skills', conducted_hours: 4, attended_hours: 4, percentage: 100, eligible: true },
+          { module_code: 'M03', title: 'Corporate Administration & Management', conducted_hours: 0, attended_hours: 0, percentage: 100, eligible: true },
+          { module_code: 'M04', title: 'Modern HR Management with AI', conducted_hours: 0, attended_hours: 0, percentage: 100, eligible: true }
+        ]
+      };
+    }
+
+    case 'getAttendanceOverview': {
+      return {
+        overall_institute_pct: 92.4,
+        total_enrolled: db.students.length,
+        total_eligible: db.students.filter(s => s.status !== 'DROPPED').length,
+        eligible_percentage: 91.8,
+        today_present_count: 24,
+        today_late_count: 1,
+        today_absent_count: 2,
+        batches: db.batches.map(b => ({
           batch_id: b.id,
           batch_code: b.batch_code,
           name: b.name,
-          collected: Math.round(totalCollected * 0.7),
-          pending: Math.round(totalPending * 0.7),
-          overdue: Math.round(totalOverdue * 0.7)
+          status: b.status,
+          average_attendance_pct: 92.5,
+          eligible_students: 18,
+          total_students: 20
         }))
       };
     }
 
-    case 'savePreferences': {
-      const { student_id, location_1, location_2, location_3, role_1, role_2, role_3, professional_email } = payload;
-      const student = db.students.find(s => s.student_id === student_id);
-      if (student) student.professional_email = professional_email;
+    case 'getFeeAnalytics': {
+      const totalCollected = (db.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      return {
+        total_collected: totalCollected || 178500,
+        total_pending: 82400,
+        total_overdue: 16500,
+        next_7_days_due: 27500,
+        batch_breakdown: db.batches.map(b => ({
+          batch_id: b.id,
+          batch_code: b.batch_code,
+          name: b.name,
+          collected: 125000,
+          pending: 45000,
+          overdue: 11000
+        }))
+      };
+    }
 
-      let pref = db.preferences.find(p => p.student_id === student_id);
-      if (pref) {
-        Object.assign(pref, { location_1, location_2, location_3, role_1, role_2, role_3, professional_email_confirmed: true });
+    case 'getAccessibleNotes': {
+      return { notes: db.notes || [], assignments: db.noteAssignments || [] };
+    }
+
+    case 'saveNote': {
+      const note = {
+        id: payload.id || ('not-' + Date.now()),
+        module_code: payload.module_code,
+        title: payload.title,
+        file_type: payload.file_type || 'PDF',
+        file_url: payload.file_url,
+        description: payload.description || '',
+        assigned_trainer_id: payload.assigned_trainer_id || 'TR-101'
+      };
+      if (!db.notes) db.notes = [];
+      const idx = db.notes.findIndex(n => n.id === note.id);
+      if (idx !== -1) {
+        db.notes[idx] = note;
       } else {
-        db.preferences.push({
-          id: 'pref-' + Date.now(),
-          student_id,
-          location_1, location_2, location_3,
-          role_1, role_2, role_3,
-          professional_email_confirmed: true
-        });
+        db.notes.push(note);
       }
+      saveMockDb(db);
+      return note;
+    }
+
+    case 'deleteNote': {
+      db.notes = (db.notes || []).filter(n => n.id !== payload.note_id);
+      saveMockDb(db);
+      return { note_id: payload.note_id, deleted: true };
+    }
+
+    case 'assignNoteToBatch': {
+      if (!db.noteAssignments) db.noteAssignments = [];
+      db.noteAssignments.push({
+        id: 'na-' + Date.now(),
+        note_id: payload.note_id,
+        batch_id: payload.batch_id,
+        assigned_by: currentUser.id,
+        assigned_at: new Date().toISOString()
+      });
       saveMockDb(db);
       return { success: true };
     }
 
-    case 'scheduleInterview': {
-      const interview = {
-        id: 'int-' + Date.now(),
-        student_id: payload.student_id,
-        company: payload.company,
-        position: payload.position,
-        location: payload.location,
-        interview_date: payload.interview_date,
-        interview_time: payload.interview_time,
-        status: 'SCHEDULED',
-        result: 'PENDING',
-        email_sent_at: new Date().toISOString()
-      };
-      db.interviews.push(interview);
-      saveMockDb(db);
-      return interview;
-    }
-
-    case 'recordOffer': {
-      const offer = {
-        id: 'off-' + Date.now(),
-        student_id: payload.student_id,
-        company: payload.company,
-        position: payload.position,
-        location: payload.location,
-        package_lpa: Number(payload.package_lpa) || 3.5,
-        offer_date: payload.offer_date || new Date().toISOString().substring(0, 10),
-        joining_date: payload.joining_date,
-        status: 'ACCEPTED',
-        email_sent_at: new Date().toISOString()
-      };
-      db.offers.push(offer);
-      const st = db.placementStatuses.find(p => p.student_id === payload.student_id);
-      if (st) st.state = 'PLACED';
-      else db.placementStatuses.push({ id: 'ps-' + Date.now(), student_id: payload.student_id, state: 'PLACED' });
-
-      saveMockDb(db);
-      return offer;
-    }
-
     case 'getPlacementTrackerData': {
-      const batchId = payload.batch_id;
-      const students = db.students.filter(s => !batchId || s.batch_id === batchId);
-
-      const items = students.map(s => {
-        const pref = db.preferences.find(p => p.student_id === s.student_id);
-        const ps = db.placementStatuses.find(p => p.student_id === s.student_id) || { state: 'READY', reason: '' };
-        const ints = db.interviews.filter(i => i.student_id === s.student_id);
-        const offs = db.offers.filter(o => o.student_id === s.student_id);
-        const gr = db.grades.find(g => g.student_id === s.student_id) || { grade: 'A', overall_score: 90 };
-
-        return {
+      return {
+        students: db.students.map((s, idx) => ({
           student_id: s.student_id,
           admission_no: s.admission_no,
           full_name: s.full_name,
           mobile: s.mobile,
           personal_email: s.personal_email,
           professional_email: s.professional_email,
-          professional_email_confirmed: pref?.professional_email_confirmed || false,
+          professional_email_confirmed: !!s.professional_email,
           course_code: s.course_code,
           batch_id: s.batch_id,
-          total_fee: s.total_fee || 25000,
-          mode: s.mode || 'ONLINE',
-          grade: gr.grade,
-          overall_score: gr.overall_score,
+          total_fee: s.total_fee,
+          mode: s.mode,
+          grade: 'A',
+          overall_score: 90.5,
           attendance_percentage: 95.0,
           is_eligible: true,
           shortfall_hours: 0,
-          preferences: pref,
-          placement_state: ps.state,
-          placement_reason: ps.reason,
-          interviews_count: ints.length,
-          offers_count: offs.length,
-          interviews: ints,
-          offers: offs,
-          agreement_status: s.status === 'ACTIVE' ? 'SIGNED_VERIFIED' : 'PENDING_VERIFICATION',
-          agreement_id: 'AGR-2026-' + s.admission_no.replace(/\D/g, '').slice(-4),
-          agreement_signed_date: s.joined_date || '2026-02-01',
+          preferences: db.preferences?.[0] || null,
+          placement_state: 'READY',
+          placement_reason: 'Interview ready',
+          interviews_count: 1,
+          offers_count: 1,
+          interviews: db.interviews || [],
+          offers: db.offers || [],
+          agreement_status: 'SIGNED_VERIFIED',
+          agreement_id: `AGR-2026-${('0000' + (idx + 1)).slice(-4)}`,
+          agreement_signed_date: '2026-02-01',
           agreement_verified_by: 'Office Admin (Anjali)',
-          agreement_url: 'https://drive.google.com/signed_student_agreements/' + s.admission_no + '.pdf'
-        };
-      });
-
-      const signedCount = items.filter(i => i.agreement_status === 'SIGNED_VERIFIED').length;
-
-      return {
-        students: items,
-        metrics: {
-          total_candidates: items.length,
-          placement_percentage: 85.5,
-          conversion_percentage: 75.0,
-          interviews_per_student: 1.8,
-          status_breakdown: { READY: 2, INTERVIEW_SCHEDULED: 1, PLACED: 1, OFFERED: 0, NO_NEED_JOB: 0, NOT_NOW: 0, PREF_PENDING: 0 },
-          company_breakdown: { 'Aster DM Healthcare': 2, 'KIMS Health': 1, 'Baby Memorial Hospital': 1 },
-          location_breakdown: { Calicut: 3, Kochi: 2, Kannur: 1 },
-          role_breakdown: { 'HR Executive': 2, 'Hospital Administration Executive': 1, 'Operations Executive': 1 },
-          agreement_summary: {
-            total_enrolled: items.length,
-            signed_verified: signedCount,
-            pending: items.length - signedCount,
-            coverage_percentage: items.length > 0 ? Number(((signedCount / items.length) * 100).toFixed(1)) : 100
-          }
-        }
-      };
-    }
-
-    case 'submitDutyDone': {
-      const { duty_id, remark, evidence } = payload;
-      const duty = db.duties.find(d => d.id === duty_id);
-      if (duty) {
-        duty.status = 'DONE';
-        duty.done_at = new Date().toISOString();
-        duty.remark = remark;
-      }
-      if (evidence && evidence.length) {
-        evidence.forEach(e => {
-          db.dutyEvidence.push({
-            id: 'ev-' + Date.now(),
-            duty_id,
-            file_url: e.file_url,
-            type: e.type || 'IMAGE',
-            note: e.note || ''
-          });
-        });
-      }
-      saveMockDb(db);
-      return { success: true };
-    }
-
-    case 'reviewDuty': {
-      const { duty_id, rating, comment } = payload;
-      const duty = db.duties.find(d => d.id === duty_id);
-      if (duty) {
-        duty.status = 'REVIEWED';
-        duty.review_rating = rating;
-        duty.review_comment = comment;
-      }
-      saveMockDb(db);
-      return { success: true };
-    }
-
-    case 'getStaffDutiesAndKPIs': {
-      return {
-        duties: db.duties,
-        tasks: [],
-        kpis: db.kpis
-      };
-    }
-
-    case 'getHRStaffReviewData': {
-      const staffList = db.users.filter(u => u.role !== 'STUDENT' && u.role !== 'MAIN_ADMIN');
-      return {
-        staff: staffList.map(s => ({
-          user_id: s.id,
-          staff_id: s.staff_id || 'ST-01',
-          full_name: s.full_name,
-          role: s.role,
-          department: s.department,
-          today_duties_total: 3,
-          today_duties_done: 2,
-          today_completion_pct: 67,
-          total_missed_duties: 0,
-          kpi_score: 92.5
+          agreement_url: 'https://drive.google.com/signed_student_agreements/sample.pdf'
         })),
-        total_staff: staffList.length
-      };
-    }
-
-    case 'getAccessibleNotes': {
-      return {
-        notes: db.notes,
-        assignments: db.noteAssignments
-      };
-    }
-
-    case 'saveNote': {
-      let existingNote = payload.id ? db.notes.find(n => n.id === payload.id) : null;
-      if (existingNote) {
-        existingNote.module_code = payload.module_code;
-        existingNote.title = payload.title;
-        existingNote.file_type = payload.file_type || 'PDF';
-        existingNote.file_url = payload.file_url;
-        existingNote.description = payload.description || '';
-        existingNote.assigned_trainer_id = payload.assigned_trainer_id || '';
-        existingNote.updated_at = new Date().toISOString();
-        if (payload.batch_id) {
-          const existAssign = db.noteAssignments.find(a => a.note_id === existingNote.id && a.batch_id === payload.batch_id);
-          if (!existAssign) {
-            db.noteAssignments.push({ id: 'na-' + Date.now(), note_id: existingNote.id, batch_id: payload.batch_id, assigned_at: new Date().toISOString() });
+        metrics: {
+          total_candidates: db.students.length,
+          placement_percentage: 85.0,
+          conversion_percentage: 75.0,
+          interviews_per_student: 1.5,
+          status_breakdown: { READY: 2, INTERVIEW_SCHEDULED: 1, PLACED: 1, NO_NEED_JOB: 0, NOT_NOW: 0, PREF_PENDING: 0 },
+          agreement_summary: {
+            total_enrolled: db.students.length,
+            signed_verified: db.students.length,
+            pending: 0,
+            coverage_percentage: 100
           }
         }
-        saveMockDb(db);
-        return existingNote;
-      }
-
-      const newNote = {
-        id: 'not-' + Date.now(),
-        module_code: payload.module_code,
-        title: payload.title,
-        file_type: payload.file_type || 'PDF',
-        file_url: payload.file_url,
-        description: payload.description || '',
-        assigned_trainer_id: payload.assigned_trainer_id || 'TR-101',
-        is_active: true,
-        created_at: new Date().toISOString()
       };
-      db.notes.push(newNote);
-
-      if (payload.batch_id) {
-        db.noteAssignments.push({
-          id: 'na-' + Date.now(),
-          note_id: newNote.id,
-          batch_id: payload.batch_id,
-          assigned_at: new Date().toISOString()
-        });
-      }
-
-      saveMockDb(db);
-      return newNote;
-    }
-
-    case 'deleteNote': {
-      const noteId = payload.note_id || payload.id;
-      db.notes = db.notes.filter(n => n.id !== noteId);
-      db.noteAssignments = db.noteAssignments.filter(a => a.note_id !== noteId);
-      saveMockDb(db);
-      return { note_id: noteId, deleted: true };
-    }
-
-    case 'assignNoteToBatch': {
-      const exist = db.noteAssignments.find(a => a.note_id === payload.note_id && a.batch_id === payload.batch_id);
-      if (exist) return exist;
-      const assign = {
-        id: 'na-' + Date.now(),
-        note_id: payload.note_id,
-        batch_id: payload.batch_id,
-        assigned_at: new Date().toISOString()
-      };
-      db.noteAssignments.push(assign);
-      saveMockDb(db);
-      return assign;
     }
 
     case 'getBatchChatMessages': {
-      return {
-        messages: db.chatMessages.filter(m => m.batch_id === payload.batch_id || !payload.batch_id)
-      };
+      return { messages: db.chatMessages || [] };
     }
 
     case 'sendBatchChatMessage': {
       const msg = {
         id: 'msg-' + Date.now(),
-        batch_id: payload.batch_id,
+        batch_id: payload.batch_id || 'batch-1',
         sender_id: currentUser.id,
         sender_name: currentUser.full_name,
         sender_role: currentUser.role,
         message: payload.message,
-        file_url: payload.file_url || '',
-        file_name: payload.file_name || '',
         created_at: new Date().toISOString()
       };
+      if (!db.chatMessages) db.chatMessages = [];
       db.chatMessages.push(msg);
       saveMockDb(db);
       return msg;
     }
 
-    case 'getSettings': {
-      return db.settings;
-    }
-
-    case 'getUsersList': {
-      return db.users;
-    }
-
-    case 'getAuditLogs': {
-      return db.auditLogs;
-    }
-
     default:
-      console.warn('Unhandled mock action:', action);
+      console.warn('Unhandled mock action:', action, payload);
       return { success: true };
   }
 }

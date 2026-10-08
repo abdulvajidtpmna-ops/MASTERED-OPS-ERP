@@ -68,14 +68,23 @@ function recordPayment(payload, currentUser) {
     lock.releaseLock();
   }
 
+  // Determine due_month, paid_month, and sales_staff_id
+  var nowIso = new Date().toISOString();
+  var paidMonth = nowIso.substring(0, 7);
+  var dueMonth = installment.due_date ? String(installment.due_date).substring(0, 7) : paidMonth;
+  var salesStaffId = student.sales_staff_id || '';
+
   // Insert Payment record
   var paymentRecord = insertRecord('Payments', {
     student_id: studentId,
     installment_id: installmentId,
     amount: amount,
+    due_month: dueMonth,
+    paid_month: paidMonth,
+    sales_staff_id: salesStaffId,
     payment_mode: paymentMode,
     reference_no: refNo || idempotencyKey || receiptNo,
-    payment_date: new Date().toISOString(),
+    payment_date: nowIso,
     collected_by: currentUser.id,
     receipt_no: receiptNo,
     receipt_url: '',

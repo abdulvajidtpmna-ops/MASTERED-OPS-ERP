@@ -269,3 +269,89 @@ function formatINR(val) {
   var res = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
   return '₹' + res;
 }
+
+/**
+ * Format Date to YYYY-MM-DD
+ */
+function formatDateYYYYMMDD(d) {
+  if (!d) return '';
+  var dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  var month = '' + (dt.getMonth() + 1);
+  var day = '' + dt.getDate();
+  var year = dt.getFullYear();
+  if (month.length < 2) month = '0' + month;
+  if (day.length < 2) day = '0' + day;
+  return [year, month, day].join('-');
+}
+
+/**
+ * Idempotent Database Schema & Data Migration v2
+ * Safely adds missing tabs and columns without deleting existing data.
+ */
+function migrate_v2() {
+  var db = getDb();
+  var now = new Date().toISOString();
+
+  // 1. Tab definitions for v2
+  var V2_TABS = {
+    Settings: ['id', 'key', 'value', 'description', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    Counters: ['id', 'key', 'value', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    Users: ['id', 'username', 'email', 'mobile', 'full_name', 'role', 'department', 'student_id', 'trainer_id', 'staff_id', 'salt', 'password_hash', 'failed_attempts', 'locked_until', 'last_login_at', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    Batches: ['id', 'batch_code', 'course_code', 'name', 'slot', 'start_date', 'original_start_date', 'start_date_history_json', 'end_date', 'mode', 'status', 'default_trainer_id', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    Students: ['id', 'student_id', 'admission_no', 'mode', 'full_name', 'mobile', 'personal_email', 'professional_email', 'course_code', 'status', 'sales_staff_id', 'batch_id', 'assignment_state', 'needed_month', 'batch_change_log_json', 'outcome_status', 'outcome_reason', 'outcome_date', 'total_fee', 'joined_date', 'photo_url', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    Payments: ['id', 'student_id', 'installment_id', 'amount', 'due_month', 'paid_month', 'sales_staff_id', 'payment_mode', 'reference_no', 'payment_date', 'collected_by', 'receipt_no', 'receipt_url', 'remarks', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    Timetable: ['id', 'batch_id', 'date', 'slot', 'module_code', 'topic_id', 'trainer_id', 'room', 'locked', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    TimetableLog: ['id', 'timetable_id', 'batch_id', 'date', 'slot', 'old_values_json', 'new_values_json', 'changed_by', 'changed_at', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    SalesDailyCounts: ['id', 'staff_id', 'date', 'leads', 'qualified', 'interested', 'bucket_new', 'bucket_lost', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    Incentives: ['id', 'staff_id', 'month', 'collections_total', 'incentive_amount', 'deductions_amount', 'net_incentive', 'details_json', 'calculated_at', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted']
+  };
+
+  // Ensure tabs & columns exist
+  for (var tabName in V2_TABS) {
+    var reqCols = V2_TABS[tabName];
+    var sheet = db.getSheetByName(tabName);
+    if (!sheet) {
+      sheet = db.insertSheet(tabName);
+      sheet.appendRow(reqCols);
+      sheet.setFrozenRows(1);
+      sheet.getRange(1, 1, 1, reqCols.length).setFontWeight('bold').setBackground('#061B4D').setFontColor('#FFFFFF');
+    } else {
+      // Add missing columns
+      var existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+      for (var c = 0; c < reqCols.length; c++) {
+        var col = reqCols[c];
+        if (existingHeaders.indexOf(col) === -1) {
+          var newColIndex = sheet.getLastColumn() + 1;
+          sheet.getRange(1, newColIndex).setValue(col).setFontWeight('bold').setBackground('#061B4D').setFontColor('#FFFFFF');
+        }
+      }
+    }
+  }
+
+  // Ensure default Settings
+  var defaultSettings = [
+    { key: 'next_offline_no', value: '2017', description: 'Next sequential offline admission number' },
+    { key: 'next_online_no', value: '1034', description: 'Next sequential online admission number' },
+    { key: 'timetable_lock_hours', value: '24', description: 'Hours before session start when timetable locks' },
+    { key: 'incentive_pct', value: '10', description: 'Sales incentive percentage from collections' },
+    { key: 'incentive_includes_registration', value: 'true', description: 'Whether registration & balance fee count towards sales incentive' },
+    { key: 'drop_penalty', value: '250', description: 'Deduction per dropped student who did not attend any class' },
+    { key: 'ROOMS_LIST', value: JSON.stringify(['IT Tech Lab', 'Success Room', 'Future CEO', 'Growth Room', 'Idea Room', 'BSchool']), description: 'Academy Classroom Rooms' },
+    { key: 'SLOTS_LIST', value: JSON.stringify(['8:30 AM', '10:30 AM', '12:30 PM']), description: 'Allowed Batch Time Slots' }
+  ];
+
+  var existingSettings = getTableData('Settings');
+  var settingsMap = {};
+  existingSettings.forEach(function(s) { settingsMap[s.key] = s; });
+
+  for (var s = 0; s < defaultSettings.length; s++) {
+    var def = defaultSettings[s];
+    if (!settingsMap[def.key]) {
+      insertRecord('Settings', def, 'MIGRATE_V2');
+    }
+  }
+
+  return { ok: true, message: 'v2 migration completed successfully.' };
+}
+

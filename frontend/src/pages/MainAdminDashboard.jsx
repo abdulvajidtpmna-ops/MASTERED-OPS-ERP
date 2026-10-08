@@ -17,18 +17,8 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
+  Layers,
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
 
 export function MainAdminDashboard() {
   const navigate = useNavigate();
@@ -36,21 +26,24 @@ export function MainAdminDashboard() {
   const [batches, setBatches] = useState([]);
   const [placementData, setPlacementData] = useState(null);
   const [attendanceData, setAttendanceData] = useState(null);
+  const [topicsReport, setTopicsReport] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [fees, batchList, placement, attOverview] = await Promise.all([
+        const [fees, batchList, placement, attOverview, topicsRes] = await Promise.all([
           apiCall('getFeeAnalytics'),
           apiCall('getBatchesList'),
           apiCall('getPlacementTrackerData'),
           apiCall('getAttendanceOverview'),
+          apiCall('getTopicsCoveredReport'),
         ]);
         setFeeData(fees);
         setBatches(batchList || []);
         setPlacementData(placement);
         setAttendanceData(attOverview);
+        setTopicsReport(topicsRes?.reports || []);
       } catch (err) {
         console.error('Main Dashboard load error:', err);
       } finally {
@@ -60,12 +53,10 @@ export function MainAdminDashboard() {
     loadData();
   }, []);
 
-  // Format currency helper
   const formatINR = (val) => {
     return '₹' + (Number(val) || 0).toLocaleString('en-IN');
   };
 
-  // Grade distribution mock/seed chart data
   const gradeDistribution = [
     { name: 'Grade A (Gold)', count: 18, color: '#F5B921' },
     { name: 'Grade B (Blue)', count: 24, color: '#0B5FFF' },
@@ -74,35 +65,11 @@ export function MainAdminDashboard() {
     { name: 'Grade F (Red)', count: 2, color: '#DC2626' },
   ];
 
-  // Topics covered vs plan data
-  const topicsProgress = [
-    {
-      batchName: 'HRCA / BHA Morning Super Batch',
-      batchCode: 'HRCA-B26-01',
-      totalPlanned: 45,
-      actualCovered: 18,
-      lastSession: 'Feb 07, 2026 (10:00 - 14:00)',
-      lastTopic: 'Gen AI for Business & Administration (M02)',
-      trainer: 'Vajid Trainer',
-      progressPct: 40,
-    },
-    {
-      batchName: 'Corporate Weekend Cohort',
-      batchCode: 'HRCA-B26-02',
-      totalPlanned: 40,
-      actualCovered: 8,
-      lastSession: 'Feb 06, 2026 (14:00 - 16:00)',
-      lastTopic: 'Digital Literacy for Workplace (M01)',
-      trainer: 'Rasheed',
-      progressPct: 20,
-    },
-  ];
-
   if (loading) {
     return (
       <div className="py-12 text-center">
         <div className="animate-spin w-8 h-8 border-4 border-gold-500 border-t-transparent rounded-full mx-auto" />
-        <p className="text-xs text-gray-500 mt-2 font-medium">Loading Main Executive Dashboard...</p>
+        <p className="text-xs text-gray-500 mt-2 font-medium">Loading Executive Master Console...</p>
       </div>
     );
   }
@@ -111,6 +78,44 @@ export function MainAdminDashboard() {
     status_breakdown: { READY: 12, INTERVIEW_SCHEDULED: 8, PLACED: 14, NO_NEED_JOB: 2, NOT_NOW: 1 },
     total_candidates: 37,
   };
+
+  const batchReports = topicsReport && topicsReport.length > 0 ? topicsReport : [
+    {
+      batch_code: 'BH17',
+      batch_name: 'BH17 (HR & Corporate Admin)',
+      slot: '10:30 AM',
+      planned_hours: 60,
+      covered_hours: 8,
+      planned_topics: 30,
+      covered_topics_count: 4,
+      progress_pct: 13,
+      last_session: {
+        date: '2026-02-08',
+        time: '10:00 - 12:00',
+        module_code: 'M02',
+        topic: 'Gen AI for Business & Administration',
+        trainer_name: 'Vajid Trainer',
+      },
+      covered_sessions: [
+        { date: '2026-02-05', module_code: 'M01', topic: 'Ice Breaking & Public Speaking', trainer_name: 'Vajid Trainer', hours: 2 },
+        { date: '2026-02-06', module_code: 'M01', topic: 'Gen AI & Career Clarity', trainer_name: 'Vajid Trainer', hours: 2 },
+        { date: '2026-02-07', module_code: 'M02', topic: 'Google Workspace for Business', trainer_name: 'Rasheed', hours: 2 },
+        { date: '2026-02-08', module_code: 'M02', topic: 'Gen AI for Business & Administration', trainer_name: 'Vajid Trainer', hours: 2 },
+      ],
+    },
+    {
+      batch_code: 'BH19',
+      batch_name: 'BH19 (Corporate Weekend Cohort)',
+      slot: '8:30 AM',
+      planned_hours: 60,
+      covered_hours: 0,
+      planned_topics: 30,
+      covered_topics_count: 0,
+      progress_pct: 0,
+      last_session: null,
+      covered_sessions: [],
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -133,7 +138,7 @@ export function MainAdminDashboard() {
         </div>
       </div>
 
-      {/* (a) CONSOLIDATED FEE DATA */}
+      {/* (1) CONSOLIDATED FEE DATA */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <IndianRupee className="w-5 h-5 text-gold-600" />
@@ -185,8 +190,8 @@ export function MainAdminDashboard() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {(feeData?.batch_breakdown || [
-                  { batch_code: 'HRCA-B26-01', name: 'HRCA / BHA Morning Super Batch', collected: 125000, pending: 45000, overdue: 11000 },
-                  { batch_code: 'HRCA-B26-02', name: 'Corporate Weekend Cohort', collected: 53500, pending: 37400, overdue: 5500 },
+                  { batch_code: 'BH17', name: 'BH17 (HR & Corporate Admin)', collected: 125000, pending: 45000, overdue: 11000 },
+                  { batch_code: 'BH19', name: 'BH19 (Corporate Weekend Cohort)', collected: 53500, pending: 37400, overdue: 5500 },
                 ]).map((b, idx) => {
                   const total = b.collected + b.pending;
                   const pct = total > 0 ? Math.round((b.collected / total) * 100) : 0;
@@ -216,9 +221,9 @@ export function MainAdminDashboard() {
         </Card>
       </div>
 
-      {/* (b) OVERALL ATTENDANCE & (c) OVERALL ASSESSMENT */}
+      {/* (2) OVERALL ATTENDANCE & (3) OVERALL ASSESSMENT */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* (b) Overall Attendance */}
+        {/* Attendance Card */}
         <Card
           title="2. Overall Attendance & Placement Eligibility"
           subtitle="Real-time cohort presence averages and 85% placement benchmark tracking"
@@ -261,8 +266,8 @@ export function MainAdminDashboard() {
 
             <div className="space-y-3">
               {(attendanceData?.batches || [
-                { batch_code: 'HRCA-B26-01', name: 'HRCA Morning Super Batch', average_attendance_pct: 91.2, eligible_students: 18, total_students: 20 },
-                { batch_code: 'HRCA-B26-02', name: 'Corporate Weekend Cohort', average_attendance_pct: 84.8, eligible_students: 14, total_students: 17 },
+                { batch_code: 'BH17', name: 'BH17 Morning Batch', average_attendance_pct: 91.2, eligible_students: 18, total_students: 20 },
+                { batch_code: 'BH19', name: 'BH19 Weekend Cohort', average_attendance_pct: 84.8, eligible_students: 14, total_students: 17 },
               ]).map((b, i) => {
                 const avg = Number(b.average_attendance_pct) || 0;
                 return (
@@ -277,12 +282,6 @@ export function MainAdminDashboard() {
                         style={{ width: `${Math.min(100, avg)}%` }}
                       />
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-1.5 flex items-center justify-between">
-                      <span>Eligible Candidates: <strong className="text-emerald-700">{b.eligible_students}</strong> of {b.total_students}</span>
-                      <span className={avg >= 85 ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-semibold'}>
-                        {avg >= 85 ? '✓ Target Achieved' : '⚠ Below 85% Target'}
-                      </span>
-                    </p>
                   </div>
                 );
               })}
@@ -290,7 +289,7 @@ export function MainAdminDashboard() {
           </div>
         </Card>
 
-        {/* (c) Overall Assessment */}
+        {/* Academic Standings Card */}
         <Card
           title="3. Overall Assessment & Grade Distribution"
           subtitle="Institute-wide academic performance average and letter-grade bands"
@@ -307,7 +306,6 @@ export function MainAdminDashboard() {
               </div>
             </div>
 
-            {/* Grade Breakdown Bars */}
             <div className="space-y-2">
               <p className="text-xs font-semibold text-brand-900 uppercase tracking-wider">Candidate Grade Bands</p>
               {gradeDistribution.map((g, idx) => (
@@ -327,61 +325,105 @@ export function MainAdminDashboard() {
         </Card>
       </div>
 
-      {/* (d) ACTUAL TOPICS COVERED VS PLAN */}
+      {/* =========================================================================
+          SECTION 4: TOPICS COVERED REPORT — PER BATCH OVERVIEW (EXACT TITLE)
+          ========================================================================= */}
       <Card
-        title="4. Actual Topics Covered vs Plan"
-        subtitle="Batch-wise timetable syllabus execution with exact date, time and notes"
+        title="Topics Covered Report — per batch overview"
+        subtitle="Live syllabus progress computed from completed class sessions with exact date, time and covered topics"
       >
-        <div className="space-y-4">
-          {topicsProgress.map((tp, idx) => (
-            <div key={idx} className="p-4 rounded-xl border border-gray-200 bg-gray-50/50">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        <div className="space-y-5">
+          {batchReports.map((br, idx) => (
+            <div key={br.batch_id || idx} className="p-5 rounded-2xl border border-gray-200 bg-gray-50/60 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <span className="font-mono text-xs text-brand-500 font-semibold">{tp.batchCode}</span>
-                  <h4 className="font-poppins font-bold text-brand-900 text-sm">{tp.batchName}</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold bg-brand-900 text-gold-400 px-2 py-0.5 rounded">
+                      {br.batch_code}
+                    </span>
+                    <h4 className="font-poppins font-bold text-brand-900 text-sm">
+                      {br.batch_name}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Slot: <strong>{br.slot}</strong> • Status: <strong>{br.status}</strong>
+                  </p>
                 </div>
+
                 <div className="text-right">
-                  <span className="text-xs font-bold text-brand-900">
-                    {tp.actualCovered} / {tp.totalPlanned} Topics Completed ({tp.progressPct}%)
+                  <span className="text-sm font-bold text-brand-900">
+                    {br.covered_hours} / {br.planned_hours} Hours Covered ({br.progress_pct}%)
                   </span>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    {br.covered_topics_count} of {br.planned_topics} Planned Topics Held
+                  </p>
                 </div>
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden mb-3">
-                <div className="h-full bg-blue-shine rounded-full" style={{ width: `${tp.progressPct}%` }} />
+              <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-brand-600 to-emerald-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, br.progress_pct)}%` }}
+                />
               </div>
 
-              {/* Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white p-3 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-brand-500 shrink-0" />
-                  <div>
-                    <span className="text-gray-500 block text-[10px] uppercase">Last Session</span>
-                    <strong className="text-brand-900">{tp.lastSession}</strong>
+              {/* Last Session Info */}
+              {br.last_session ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white p-3 rounded-xl border border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-brand-500 shrink-0" />
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Last Session</span>
+                      <strong className="text-brand-900">{br.last_session.date} ({br.last_session.time})</strong>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-gold-600 shrink-0" />
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Topic Covered</span>
+                      <strong className="text-brand-900">{br.last_session.topic}</strong>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-teal-600 shrink-0" />
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Conducted By</span>
+                      <strong className="text-brand-900">{br.last_session.trainer_name}</strong>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-gold-600 shrink-0" />
-                  <div>
-                    <span className="text-gray-500 block text-[10px] uppercase">Topic Covered</span>
-                    <strong className="text-brand-900">{tp.lastTopic}</strong>
+              ) : (
+                <div className="p-3 bg-white rounded-xl border border-gray-200 text-xs text-gray-400 italic">
+                  No sessions marked as held yet for this cohort.
+                </div>
+              )}
+
+              {/* Detailed Completed Topics Dropdown/Drawer */}
+              {br.covered_sessions && br.covered_sessions.length > 0 && (
+                <div className="pt-2">
+                  <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1.5">
+                    Completed Topics Log ({br.covered_sessions.length}):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {br.covered_sessions.map((cs, i) => (
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-semibold"
+                        title={`${cs.date} - ${cs.trainer_name} (${cs.hours}h)`}
+                      >
+                        ✓ {cs.module_code}: {cs.topic} ({cs.date})
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-teal-600 shrink-0" />
-                  <div>
-                    <span className="text-gray-500 block text-[10px] uppercase">Conducted By</span>
-                    <strong className="text-brand-900">{tp.trainer}</strong>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           ))}
         </div>
       </Card>
 
-      {/* (e) PLACEMENT SUMMARY CARD LINKING TO PLACEMENT TRACKER */}
+      {/* (5) PLACEMENT SUMMARY CARD LINKING TO PLACEMENT TRACKER */}
       <Card
         title="5. Placement Pipeline Summary"
         subtitle="Live candidate career funnel linking to full Placement Tracker"

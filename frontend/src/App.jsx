@@ -10,6 +10,7 @@ import { OpsAdminDashboard } from './pages/OpsAdminDashboard';
 import { AdmissionsPage } from './pages/AdmissionsPage';
 import { AfterSalesPage } from './pages/AfterSalesPage';
 import { BatchesPage } from './pages/BatchesPage';
+import { TimetablePage } from './pages/TimetablePage';
 import { FeeCollectionPage } from './pages/FeeCollectionPage';
 import { AgreementsPage } from './pages/AgreementsPage';
 import { PlacementTrackerPage } from './pages/PlacementTrackerPage';
@@ -102,12 +103,22 @@ export function App() {
           }
         />
 
-        {/* 5. Batches & Timetable */}
+        {/* 5. Batches Management */}
         <Route
           path="/batches"
           element={
             <RoleRoute allowedRoles={['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC', 'OFFICE_ADMIN']}>
               <BatchesPage />
+            </RoleRoute>
+          }
+        />
+
+        {/* 5b. Daily Timetable Grid */}
+        <Route
+          path="/timetable"
+          element={
+            <RoleRoute allowedRoles={['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC']}>
+              <TimetablePage />
             </RoleRoute>
           }
         />

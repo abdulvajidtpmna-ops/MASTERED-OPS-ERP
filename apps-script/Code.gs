@@ -36,6 +36,12 @@ function doPost(e) {
       return jsonResponse(loginResult.ok, loginResult.data, loginResult.error, loginResult.code);
     }
 
+    // Schema Migration (Public or Main Admin)
+    if (action === 'migrate_v2') {
+      var migResult = migrate_v2();
+      return jsonResponse(migResult.ok, migResult.message);
+    }
+
     // Authenticated actions
     var currentUser = requireAuth(token);
 
@@ -72,13 +78,43 @@ function doPost(e) {
       case 'getAdmissions':
         result = getAdmissions(payload, currentUser);
         break;
+      case 'saveSalesDailyCounts':
+        result = saveSalesDailyCounts(payload, currentUser);
+        break;
+      case 'getSalesDailyCounts':
+        result = getSalesDailyCounts(payload, currentUser);
+        break;
+      case 'getMyIncentives':
+        result = getMyIncentives(payload, currentUser);
+        break;
+      case 'setStudentOutcomeStatus':
+        result = setStudentOutcomeStatus(payload, currentUser);
+        break;
 
       // 3. Operations & Batches
+      case 'createBatch':
+        result = createBatch(payload, currentUser);
+        break;
+      case 'postponeBatchStartDate':
+        result = postponeBatchStartDate(payload, currentUser);
+        break;
+      case 'updateBatch':
+        result = updateBatch(payload, currentUser);
+        break;
       case 'logAfterSalesCall':
         result = logAfterSalesCall(payload, currentUser);
         break;
       case 'assignBatch':
         result = assignBatch(payload, currentUser);
+        break;
+      case 'deferStudent':
+        result = deferStudent(payload, currentUser);
+        break;
+      case 'changeStudentBatch':
+        result = changeStudentBatch(payload, currentUser);
+        break;
+      case 'getAfterSalesData':
+        result = getAfterSalesData(payload, currentUser);
         break;
       case 'startBatch':
         result = startBatch(payload, currentUser);
@@ -93,7 +129,21 @@ function doPost(e) {
         result = getBatchesList(payload, currentUser);
         break;
 
-      // 4. Attendance
+      // 4. Timetable Grid & Topics Covered
+      case 'getTimetableForDate':
+        result = getTimetableForDate(payload, currentUser);
+        break;
+      case 'bulkSaveTimetableGrid':
+        result = bulkSaveTimetableGrid(payload, currentUser);
+        break;
+      case 'getStudentTomorrowClass':
+        result = getStudentTomorrowClass(payload.student_id, currentUser);
+        break;
+      case 'getTopicsCoveredReport':
+        result = getTopicsCoveredReport(currentUser);
+        break;
+
+      // 5. Attendance
       case 'markAttendance':
         result = markAttendance(payload, currentUser);
         break;
@@ -105,7 +155,7 @@ function doPost(e) {
         result = getAttendanceOverview(currentUser);
         break;
 
-      // 5. Assessments & Grades
+      // 6. Assessments & Grades
       case 'saveAssessment':
         result = saveAssessment(payload, currentUser);
         break;
@@ -113,7 +163,7 @@ function doPost(e) {
         result = { ok: true, data: recalculateStudentGrade(payload.student_id, payload.batch_id, currentUser) };
         break;
 
-      // 6. Fees & Postponements
+      // 7. Fees & Postponements
       case 'recordPayment':
         result = recordPayment(payload, currentUser);
         break;
@@ -127,12 +177,12 @@ function doPost(e) {
         result = { ok: true, data: getFeeAnalytics() };
         break;
 
-      // 7. Agreements
+      // 8. Agreements
       case 'processSignedAgreement':
         result = processSignedAgreement(payload, currentUser);
         break;
 
-      // 8. Placement
+      // 9. Placement
       case 'savePreferences':
         result = savePreferences(payload, currentUser);
         break;
@@ -146,7 +196,7 @@ function doPost(e) {
         result = getPlacementTrackerData(payload.batch_id, currentUser);
         break;
 
-      // 9. Duties & HR Review
+      // 10. Duties & HR Review
       case 'submitDutyDone':
         result = submitDutyDone(payload, currentUser);
         break;
@@ -163,7 +213,7 @@ function doPost(e) {
         result = getHRStaffReviewData(currentUser);
         break;
 
-      // 10. Notes & Study Materials
+      // 11. Notes & Study Materials
       case 'saveNote':
         result = saveNote(payload, currentUser);
         break;
@@ -177,7 +227,7 @@ function doPost(e) {
         result = getAccessibleNotes(payload.batch_id, currentUser);
         break;
 
-      // 11. Batch Community Chat
+      // 12. Batch Community Chat
       case 'sendBatchChatMessage':
         result = sendBatchChatMessage(payload, currentUser);
         break;
@@ -185,7 +235,7 @@ function doPost(e) {
         result = getBatchChatMessages(payload.batch_id, payload.after_timestamp, currentUser);
         break;
 
-      // 12. Settings & Admin Data
+      // 13. Settings & Admin Data
       case 'getSettings':
         var settings = getTableData('Settings');
         var settingsMap = {};

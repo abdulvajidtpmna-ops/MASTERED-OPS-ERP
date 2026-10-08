@@ -27,13 +27,13 @@ function markAttendance(payload, currentUser) {
   }
   if (!session) throw new Error('Class session not found');
 
-  // Permission Check: Trainer of this batch OR Admin override
+  // Permission Check: Trainer of this batch OR Ops Exec / Admin override
   if (currentUser.role === 'TRAINER') {
     if (session.trainer_id && session.trainer_id !== currentUser.trainer_id && session.trainer_id !== currentUser.id) {
       throw new Error('Access denied: You are not the assigned trainer for this session');
     }
   } else {
-    requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN']);
+    requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC']);
   }
 
   // Check 7-Day Edit Window
@@ -41,7 +41,7 @@ function markAttendance(payload, currentUser) {
   var now = new Date().getTime();
   var daysDiff = (now - sessionDate) / (1000 * 60 * 60 * 24);
 
-  if (daysDiff > 7 && currentUser.role !== 'MAIN_ADMIN' && currentUser.role !== 'OPS_ADMIN') {
+  if (daysDiff > 7 && currentUser.role !== 'MAIN_ADMIN' && currentUser.role !== 'OPS_ADMIN' && currentUser.role !== 'OPS_EXEC') {
     throw new Error('Attendance edit window closed (> 7 days). Please contact Operations Admin for overrides.');
   }
 
