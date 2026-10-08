@@ -168,15 +168,15 @@ export function AfterSalesPage() {
 
   // Deferred students matched with upcoming batch month check
   const deferredMonthsMap = {};
-  afterSalesData.deferred.forEach((s) => {
-    if (s.needed_month) {
+  (afterSalesData?.deferred || []).forEach((s) => {
+    if (s && s.needed_month) {
       deferredMonthsMap[s.needed_month] = (deferredMonthsMap[s.needed_month] || 0) + 1;
     }
   });
 
-  const matchingBatches = afterSalesData.batches.filter((b) => {
-    const bMonth = b.start_date ? b.start_date.substring(0, 7) : '';
-    return deferredMonthsMap[bMonth] > 0;
+  const matchingBatches = (afterSalesData?.batches || []).filter((b) => {
+    const bMonth = b && b.start_date ? String(b.start_date).substring(0, 7) : '';
+    return bMonth && deferredMonthsMap[bMonth] > 0;
   });
 
   // Columns for Pending After Sales Tab

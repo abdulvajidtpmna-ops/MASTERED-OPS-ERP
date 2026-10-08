@@ -193,16 +193,18 @@ export function MainAdminDashboard() {
                   { batch_code: 'BH17', name: 'BH17 (HR & Corporate Admin)', collected: 125000, pending: 45000, overdue: 11000 },
                   { batch_code: 'BH19', name: 'BH19 (Corporate Weekend Cohort)', collected: 53500, pending: 37400, overdue: 5500 },
                 ]).map((b, idx) => {
-                  const total = b.collected + b.pending;
-                  const pct = total > 0 ? Math.round((b.collected / total) * 100) : 0;
+                  const collected = Number(b.collected) || 0;
+                  const pending = Number(b.pending) || 0;
+                  const total = collected + pending;
+                  const pct = total > 0 ? Math.round((collected / total) * 100) : 0;
                   return (
                     <tr key={idx} className="hover:bg-brand-50/40">
                       <td className="py-3 font-medium text-brand-900">
                         <span className="font-mono text-xs text-brand-500 block">{b.batch_code}</span>
                         {b.name}
                       </td>
-                      <td className="py-3 text-right font-semibold text-emerald-600">{formatINR(b.collected)}</td>
-                      <td className="py-3 text-right font-medium text-gray-700">{formatINR(b.pending)}</td>
+                      <td className="py-3 text-right font-semibold text-emerald-600">{formatINR(collected)}</td>
+                      <td className="py-3 text-right font-medium text-gray-700">{formatINR(pending)}</td>
                       <td className="py-3 text-right font-semibold text-rose-600">{formatINR(b.overdue)}</td>
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -346,16 +348,16 @@ export function MainAdminDashboard() {
                     </h4>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Slot: <strong>{br.slot}</strong> • Status: <strong>{br.status}</strong>
+                    Slot: <strong>{br.slot || '10:30 AM'}</strong> • Status: <strong>{br.status || 'Active'}</strong>
                   </p>
                 </div>
 
                 <div className="text-right">
                   <span className="text-sm font-bold text-brand-900">
-                    {br.covered_hours} / {br.planned_hours} Hours Covered ({br.progress_pct}%)
+                    {br.covered_hours || 0} / {br.planned_hours || 60} Hours Covered ({br.progress_pct || 0}%)
                   </span>
                   <p className="text-[11px] text-gray-500 font-medium">
-                    {br.covered_topics_count} of {br.planned_topics} Planned Topics Held
+                    {br.covered_topics_count || 0} of {br.planned_topics || 30} Planned Topics Held
                   </p>
                 </div>
               </div>
@@ -364,7 +366,7 @@ export function MainAdminDashboard() {
               <div className="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-brand-600 to-emerald-500 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, br.progress_pct)}%` }}
+                  style={{ width: `${Math.min(100, Number(br.progress_pct) || 0)}%` }}
                 />
               </div>
 

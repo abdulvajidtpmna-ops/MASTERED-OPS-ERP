@@ -574,28 +574,28 @@ export function AdmissionsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCard
               title="Total Collections"
-              value={formatINR(incentiveData.summary?.collections_total || 0)}
+              value={formatINR(incentiveData?.summary?.collections_total || 0)}
               subtitle={`All payments received in ${targetMonth}`}
               accent="blue"
               icon={IndianRupee}
             />
             <StatCard
               title="10% Gross Incentive"
-              value={formatINR(incentiveData.summary?.gross_incentive || 0)}
+              value={formatINR(incentiveData?.summary?.gross_incentive || 0)}
               subtitle="10% of total paid collections"
               accent="emerald"
               icon={TrendingUp}
             />
             <StatCard
               title="Drop Deductions"
-              value={`−${formatINR(incentiveData.summary?.total_deductions || 0)}`}
-              subtitle={`${incentiveData.summary?.dropped_without_came_count || 0} student(s) × ₹250`}
+              value={`−${formatINR(incentiveData?.summary?.total_deductions || 0)}`}
+              subtitle={`${incentiveData?.summary?.dropped_without_came_count || 0} student(s) × ₹250`}
               accent="rose"
               icon={TrendingDown}
             />
             <StatCard
               title="Net Monthly Incentive"
-              value={formatINR(incentiveData.summary?.net_incentive || 0)}
+              value={formatINR(incentiveData?.summary?.net_incentive || 0)}
               subtitle="Gross incentive − deductions"
               accent="gold"
               icon={Sparkles}

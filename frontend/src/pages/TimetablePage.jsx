@@ -91,24 +91,30 @@ export function TimetablePage() {
 
   // Check double bookings locally in UI
   const calculateUiWarnings = (rows) => {
+    if (!Array.isArray(rows)) return [];
     const warns = [];
     const roomSlotMap = {};
     const trainerSlotMap = {};
 
     rows.forEach((r) => {
-      const roomKey = `${r.room}_${r.slot}`;
-      const trainerKey = `${r.trainer_id}_${r.slot}`;
+      if (!r || !r.slot) return;
 
-      if (roomSlotMap[roomKey]) {
-        warns.push(`⚠️ Room Conflict: '${r.room}' assigned multiple times at ${r.slot} (${roomSlotMap[roomKey].batch_name} & ${r.batch_name}).`);
-      } else {
-        roomSlotMap[roomKey] = r;
+      if (r.room) {
+        const roomKey = `${r.room}_${r.slot}`;
+        if (roomSlotMap[roomKey]) {
+          warns.push(`⚠️ Room Conflict: '${r.room}' assigned multiple times at ${r.slot} (${roomSlotMap[roomKey].batch_name || 'Batch'} & ${r.batch_name || 'Batch'}).`);
+        } else {
+          roomSlotMap[roomKey] = r;
+        }
       }
 
-      if (trainerSlotMap[trainerKey]) {
-        warns.push(`⚠️ Trainer Conflict: Trainer ${r.trainer_id} assigned multiple times at ${r.slot}.`);
-      } else {
-        trainerSlotMap[trainerKey] = r;
+      if (r.trainer_id) {
+        const trainerKey = `${r.trainer_id}_${r.slot}`;
+        if (trainerSlotMap[trainerKey]) {
+          warns.push(`⚠️ Trainer Conflict: Trainer ${r.trainer_id} assigned multiple times at ${r.slot}.`);
+        } else {
+          trainerSlotMap[trainerKey] = r;
+        }
       }
     });
 
