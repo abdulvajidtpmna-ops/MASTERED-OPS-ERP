@@ -351,23 +351,39 @@ export function StudentPortalPage() {
         >
           <div className="space-y-3">
             {notes.map((n) => (
-              <div key={n.id} className="p-4 rounded-xl border border-gray-200 bg-white flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-8 h-8 text-brand-700 shrink-0" />
-                  <div>
-                    <span className="font-mono text-xs font-bold text-brand-500">{n.module_code}</span>
-                    <h5 className="font-bold text-xs text-brand-900">{n.title}</h5>
-                    <p className="text-[11px] text-gray-500">Format: {n.file_type || 'PDF'}</p>
-                    {n.description && <p className="text-[11px] text-gray-600 mt-0.5">{n.description}</p>}
+              <div
+                key={n.id}
+                className="p-4 rounded-2xl border border-gray-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
+              >
+                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                  <div className="p-2.5 bg-brand-50 text-brand-700 rounded-xl border border-brand-200/60 shrink-0">
+                    <FileText className="w-6 h-6 text-brand-700" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="font-mono text-xs font-bold text-brand-600 bg-blue-50 px-2 py-0.5 rounded border border-brand-200 inline-block mb-1">
+                      {n.module_code}
+                    </span>
+                    <h5 className="font-bold text-sm text-brand-900 leading-snug break-words">
+                      {n.title}
+                    </h5>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Format: <strong className="text-gray-700">{n.file_type || 'PDF'}</strong>
+                    </p>
+                    {n.description && (
+                      <p className="text-[11px] text-gray-600 mt-1 line-clamp-2">
+                        {n.description}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 shrink-0 w-full sm:w-auto">
                   <Button
                     variant="secondary"
                     size="sm"
                     icon={Eye}
                     onClick={() => handleOpenNoteViewer(n)}
+                    className="flex-1 sm:flex-initial text-xs justify-center"
                   >
                     Open Inside App
                   </Button>
@@ -376,6 +392,7 @@ export function StudentPortalPage() {
                     size="sm"
                     icon={Download}
                     onClick={() => window.open(n.file_url, '_blank')}
+                    className="flex-1 sm:flex-initial text-xs justify-center shadow-gold-glow"
                   >
                     Download
                   </Button>
