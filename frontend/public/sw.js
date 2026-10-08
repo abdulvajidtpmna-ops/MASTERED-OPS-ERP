@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mastered-ops-erp-v2.2.0';
+const CACHE_NAME = 'mastered-ops-erp-v2.3.0';
 
 const STATIC_ASSETS = [
   '/',

@@ -349,41 +349,45 @@ export function StudentPortalPage() {
           title="Study Materials & Module Notes"
           subtitle="Open documents inside the app viewer or download directly to your device"
         >
-          <div className="space-y-3">
+          <div className="space-y-4">
             {notes.map((n) => (
               <div
                 key={n.id}
-                className="p-4 rounded-2xl border border-gray-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
+                className="p-4 sm:p-5 rounded-2xl border-2 border-gray-200/80 bg-white hover:border-brand-400 hover:shadow-md transition-all flex flex-col justify-between gap-4 overflow-hidden"
               >
-                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                  <div className="p-2.5 bg-brand-50 text-brand-700 rounded-xl border border-brand-200/60 shrink-0">
+                {/* Header: Module Tag + Format + Title */}
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <div className="p-3 bg-brand-50 text-brand-700 rounded-2xl border border-brand-200/80 shrink-0">
                     <FileText className="w-6 h-6 text-brand-700" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="font-mono text-xs font-bold text-brand-600 bg-blue-50 px-2 py-0.5 rounded border border-brand-200 inline-block mb-1">
-                      {n.module_code}
-                    </span>
-                    <h5 className="font-bold text-sm text-brand-900 leading-snug break-words">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className="font-mono text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-0.5 rounded-lg border border-brand-200">
+                        {n.module_code}
+                      </span>
+                      <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-lg border border-gray-200 uppercase">
+                        {n.file_type || 'PDF'}
+                      </span>
+                    </div>
+                    <h4 className="font-poppins font-bold text-sm sm:text-base text-brand-900 leading-snug break-words">
                       {n.title}
-                    </h5>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      Format: <strong className="text-gray-700">{n.file_type || 'PDF'}</strong>
-                    </p>
+                    </h4>
                     {n.description && (
-                      <p className="text-[11px] text-gray-600 mt-1 line-clamp-2">
+                      <p className="text-xs text-gray-600 mt-1 line-clamp-2 leading-relaxed">
                         {n.description}
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 shrink-0 w-full sm:w-auto">
+                {/* Bottom Full-Width Action Buttons: Grid layout guarantees zero overflow on any device */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3 border-t border-gray-100 w-full">
                   <Button
                     variant="secondary"
                     size="sm"
                     icon={Eye}
                     onClick={() => handleOpenNoteViewer(n)}
-                    className="flex-1 sm:flex-initial text-xs justify-center"
+                    className="w-full justify-center text-xs py-2"
                   >
                     Open Inside App
                   </Button>
@@ -392,17 +396,18 @@ export function StudentPortalPage() {
                     size="sm"
                     icon={Download}
                     onClick={() => window.open(n.file_url, '_blank')}
-                    className="flex-1 sm:flex-initial text-xs justify-center shadow-gold-glow"
+                    className="w-full justify-center text-xs py-2 shadow-gold-glow"
                   >
-                    Download
+                    Download File
                   </Button>
                 </div>
               </div>
             ))}
 
             {notes.length === 0 && (
-              <div className="py-8 text-center text-gray-400 italic">
-                No study materials assigned to your cohort yet.
+              <div className="py-12 text-center text-gray-400 italic">
+                <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                <p>No study materials assigned to your cohort yet.</p>
               </div>
             )}
           </div>
