@@ -24,6 +24,7 @@ import {
   Eye,
   Building,
   UserCheck,
+  BookOpen,
 } from 'lucide-react';
 
 export function StudentPortalPage() {
