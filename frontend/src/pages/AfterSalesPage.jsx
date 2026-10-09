@@ -359,7 +359,7 @@ export function AfterSalesPage() {
           }`}
         >
           <PhoneCall className="w-4 h-4 text-gold-400" />
-          Pending After Sales ({afterSalesData.pending.length})
+          Pending After Sales ({afterSalesData?.pending?.length || 0})
         </button>
         <button
           onClick={() => setActiveTab('DEFERRED')}
@@ -370,7 +370,7 @@ export function AfterSalesPage() {
           }`}
         >
           <CalendarClock className="w-4 h-4 text-gold-400" />
-          Deferred by Month ({afterSalesData.deferred.length})
+          Deferred by Month ({afterSalesData?.deferred?.length || 0})
         </button>
         <button
           onClick={() => setActiveTab('ASSIGNED')}
@@ -381,7 +381,7 @@ export function AfterSalesPage() {
           }`}
         >
           <Layers className="w-4 h-4 text-gold-400" />
-          Batches Assigned ({afterSalesData.assigned.length})
+          Batches Assigned ({afterSalesData?.assigned?.length || 0})
         </button>
       </div>
 
@@ -418,8 +418,8 @@ export function AfterSalesPage() {
       {/* 3. BATCHES ASSIGNED TAB (Grouped by Batch) */}
       {activeTab === 'ASSIGNED' && (
         <div className="space-y-6">
-          {afterSalesData.batches.map((batch) => {
-            const batchStudents = afterSalesData.assigned.filter((s) => s.batch_id === batch.id);
+          {(afterSalesData?.batches || []).map((batch) => {
+            const batchStudents = (afterSalesData?.assigned || []).filter((s) => s.batch_id === batch.id);
 
             return (
               <Card
@@ -594,7 +594,7 @@ export function AfterSalesPage() {
               onChange={(e) => setSelectedBatchId(e.target.value)}
               className="w-full p-2.5 bg-white border border-gray-200 rounded-xl font-bold text-brand-900"
             >
-              {afterSalesData.batches.map((b) => (
+              {(afterSalesData?.batches || []).map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name || b.batch_code} — Slot: {b.slot || '10:30 AM'} — Starts {b.start_date || 'TBD'} ({b.seats_assigned || 0} enrolled)
                 </option>
@@ -684,7 +684,7 @@ export function AfterSalesPage() {
               onChange={(e) => setNewBatchId(e.target.value)}
               className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-bold text-brand-900"
             >
-              {afterSalesData.batches.map((b) => (
+              {(afterSalesData?.batches || []).map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name || b.batch_code} (Slot: {b.slot || '10:30 AM'}, Starts: {b.start_date || 'TBD'})
                 </option>

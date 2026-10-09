@@ -132,7 +132,7 @@ export function TimetablePage() {
       });
 
       if (res?.errors && res.errors.length > 0) {
-        toast.error(`Some rows could not be saved due to 24h lock restrictions: ${res.errors.map(e => e.batch_name).join(', ')}`);
+        toast.error(`Some rows could not be saved due to 24h lock restrictions: ${(res?.errors || []).map(e => e.batch_name).join(', ')}`);
       } else {
         toast.success(`Successfully saved timetable grid for ${gridRows.length} batches on ${targetDate}! Students have been notified.`);
       }

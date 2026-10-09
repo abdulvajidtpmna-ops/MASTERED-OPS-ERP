@@ -225,7 +225,7 @@ export function AdmissionsPage() {
                 onChange={(e) => setSelectedStaffId(e.target.value)}
                 className="bg-brand-900 text-white font-semibold text-xs rounded-lg px-2.5 py-1 border border-brand-400 focus:outline-none"
               >
-                {dailyCountsReport.staff_list.map((st) => (
+                {(dailyCountsReport?.staff_list || []).map((st) => (
                   <option key={st.id} value={st.staff_id || st.id}>
                     {st.full_name} ({st.staff_id || 'Staff'})
                   </option>
@@ -633,7 +633,7 @@ export function AdmissionsPage() {
                       <td className="py-3 px-3 text-right font-black text-emerald-700">+{formatINR(pay.incentive_amount)}</td>
                     </tr>
                   ))}
-                  {(!incentiveData.payments || incentiveData.payments.length === 0) && (
+                  {(!Array.isArray(incentiveData?.payments) || incentiveData.payments.length === 0) && (
                     <tr>
                       <td colSpan="6" className="py-6 text-center text-gray-400 italic">
                         No fee payments recorded in {targetMonth} for your enrolled candidates.

@@ -402,7 +402,7 @@ export function MainAdminDashboard() {
               )}
 
               {/* Detailed Completed Topics Dropdown/Drawer */}
-              {br.covered_sessions && br.covered_sessions.length > 0 && (
+              {Array.isArray(br?.covered_sessions) && br.covered_sessions.length > 0 && (
                 <div className="pt-2">
                   <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1.5">
                     Completed Topics Log ({br.covered_sessions.length}):

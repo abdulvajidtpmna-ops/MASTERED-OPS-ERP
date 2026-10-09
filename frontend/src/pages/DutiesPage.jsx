@@ -38,8 +38,14 @@ export function DutiesPage() {
     try {
       setLoading(true);
       const res = await apiCall('getStaffDutiesAndKPIs', { target_user_id: user?.id });
-      setDutiesData(res || { duties: [], tasks: [], kpis: [] });
+      setDutiesData({
+        duties: Array.isArray(res?.duties) ? res.duties : [],
+        tasks: Array.isArray(res?.tasks) ? res.tasks : [],
+        kpis: Array.isArray(res?.kpis) ? res.kpis : [],
+      });
     } catch (err) {
+      console.error('Duties load error:', err);
+      setDutiesData({ duties: [], tasks: [], kpis: [] });
       toast.error('Failed to load duties & KPIs.');
     } finally {
       setLoading(false);
@@ -99,7 +105,7 @@ export function DutiesPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {(dutiesData.kpis.length ? dutiesData.kpis : [
+        {((dutiesData?.kpis && dutiesData.kpis.length > 0) ? dutiesData.kpis : [
           { kra: 'Lead Generation', kpi: 'New Inbound Inquiries', target: 20, actual: 16, unit: 'Students', status: 'ON_TRACK' },
           { kra: 'Customer Engagement', kpi: 'Daily Call Volume', target: 400, actual: 420, unit: 'Calls', status: 'ACHIEVED' },
         ]).map((k, idx) => {
@@ -137,7 +143,7 @@ export function DutiesPage() {
         subtitle="Complete recurring duties and submit evidence for review"
       >
         <div className="space-y-3">
-          {(dutiesData.duties.length ? dutiesData.duties : [
+          {((dutiesData?.duties && dutiesData.duties.length > 0) ? dutiesData.duties : [
             { id: 'dut-1', title: 'Follow-up with New Inbound Inquiries (20 Calls)', status: 'DONE', requires_evidence: true, remark: 'Completed 22 prospective calls. 3 scheduled for admissions.', review_rating: 5, review_comment: 'Excellent conversion rate!' },
             { id: 'dut-2', title: 'Update CRM daily pipeline notes', status: 'PENDING', requires_evidence: false },
           ]).map((d) => (
