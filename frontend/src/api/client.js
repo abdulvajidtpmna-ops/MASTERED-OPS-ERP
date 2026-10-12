@@ -814,6 +814,67 @@ function executeMockAction(action, payload, token) {
       return msg;
     }
 
+    case 'getUsersList': {
+      return db.users || [];
+    }
+
+    case 'getAuditLogs': {
+      return (db.auditLogs || []).slice(-200).reverse();
+    }
+
+    case 'getSettings': {
+      return db.settings || {};
+    }
+
+    case 'getStaffDutiesAndKPIs': {
+      return {
+        duties: db.dailyDuties || [],
+        tasks: db.tasks || [],
+        kpis: db.kpis || []
+      };
+    }
+
+    case 'getHRStaffReviewData': {
+      const staffList = (db.users || []).filter(u => u.role !== 'STUDENT' && u.role !== 'MAIN_ADMIN');
+      return {
+        staff: staffList.map(s => ({
+          user_id: s.id,
+          staff_id: s.staff_id || '',
+          full_name: s.full_name,
+          role: s.role,
+          department: s.department,
+          today_duties_total: 3,
+          today_duties_done: 3,
+          today_completion_pct: 100,
+          total_missed_duties: 0,
+          kpi_score: 92,
+          recent_duties: []
+        })),
+        total_staff: staffList.length
+      };
+    }
+
+    case 'getAttendanceOverview': {
+      return {
+        overall_stats: {
+          total_students: (db.students || []).length,
+          overall_percentage: 91.2,
+          eligible_students: (db.students || []).length,
+          ineligible_students: 0
+        },
+        batch_stats: (db.batches || []).map(b => ({
+          batch_id: b.id,
+          batch_name: b.name,
+          course_code: b.course_code,
+          students_count: (db.students || []).filter(s => s.batch_id === b.id).length,
+          sessions_conducted: 12,
+          average_percentage: 92.5,
+          eligible_count: (db.students || []).filter(s => s.batch_id === b.id).length,
+          shortfall_students_count: 0
+        }))
+      };
+    }
+
     default:
       console.warn('Unhandled mock action:', action, payload);
       return { success: true };

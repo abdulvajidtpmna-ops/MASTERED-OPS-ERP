@@ -31,7 +31,10 @@ export function HRReviewPage() {
     try {
       setLoading(true);
       const res = await apiCall('getHRStaffReviewData');
-      setReviewData(res || { staff: [], total_staff: 0 });
+      setReviewData({
+        staff: Array.isArray(res?.staff) ? res.staff : [],
+        total_staff: res?.total_staff || (Array.isArray(res?.staff) ? res.staff.length : 0),
+      });
     } catch (err) {
       toast.error('Failed to load HR staff review dashboard.');
     } finally {

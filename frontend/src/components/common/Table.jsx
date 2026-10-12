@@ -3,7 +3,7 @@ import { Search, Download, ChevronLeft, ChevronRight, Inbox } from 'lucide-react
 import { Button } from './Button';
 
 export function Table({
-  columns,
+  columns = [],
   data = [],
   keyField = 'id',
   searchable = true,
@@ -16,19 +16,22 @@ export function Table({
   filterSlot,
   actionsSlot,
 }) {
+  const safeData = Array.isArray(data) ? data : [];
+  const safeColumns = Array.isArray(columns) ? columns : [];
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Search filtering
   const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return data;
+    if (!searchQuery.trim()) return safeData;
     const q = searchQuery.toLowerCase();
-    return data.filter((row) =>
+    return safeData.filter((row) =>
+      row && typeof row === 'object' &&
       Object.values(row).some((val) =>
-        String(val || '').toLowerCase().includes(q)
+        String(val !== undefined && val !== null ? val : '').toLowerCase().includes(q)
       )
     );
-  }, [data, searchQuery]);
+  }, [safeData, searchQuery]);
 
   // Pagination
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
@@ -40,8 +43,8 @@ export function Table({
   // CSV Export
   const handleExportCSV = () => {
     if (!filteredData.length) return;
-    const visibleCols = columns.filter((c) => c.accessor);
-    const headers = visibleCols.map((c) => `"${c.header}"`).join(',');
+    const visibleCols = safeColumns.filter((c) => c && c.accessor);
+    const headers = visibleCols.map((c) => `"${c.header || ''}"`).join(',');
     const rows = filteredData.map((row) =>
       visibleCols
         .map((c) => {
@@ -105,12 +108,12 @@ export function Table({
           <table className="w-full text-left text-sm border-collapse">
             <thead>
               <tr className="bg-gradient-to-r from-brand-900 to-brand-700 text-white font-poppins text-xs tracking-wider uppercase">
-                {columns.map((col, idx) => (
+                {safeColumns.map((col, idx) => (
                   <th
                     key={idx}
-                    className={`py-3.5 px-4 font-semibold ${col.className || ''}`}
+                    className={`py-3.5 px-4 font-semibold ${col?.className || ''}`}
                   >
-                    {col.header}
+                    {col?.header}
                   </th>
                 ))}
               </tr>
@@ -119,23 +122,23 @@ export function Table({
               {paginatedData.length > 0 ? (
                 paginatedData.map((row, rowIdx) => (
                   <tr
-                    key={row[keyField] || rowIdx}
+                    key={(row && row[keyField]) || rowIdx}
                     className="hover:bg-brand-50/50 transition-colors duration-150"
                   >
-                    {columns.map((col, colIdx) => (
-                      <td key={colIdx} className={`py-3.5 px-4 ${col.className || ''}`}>
-                        {col.cell
+                    {safeColumns.map((col, colIdx) => (
+                      <td key={colIdx} className={`py-3.5 px-4 ${col?.className || ''}`}>
+                        {col?.cell
                           ? col.cell(row)
-                          : typeof col.accessor === 'function'
+                          : typeof col?.accessor === 'function'
                           ? col.accessor(row)
-                          : row[col.accessor] ?? '—'}
+                          : (row && col?.accessor ? row[col.accessor] : '—') ?? '—'}
                       </td>
                     ))}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={columns.length} className="py-12 text-center">
+                  <td colSpan={safeColumns.length || 1} className="py-12 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="p-3 bg-gray-100 rounded-full text-gray-400">
                         <Inbox className="w-8 h-8" />

@@ -45,9 +45,12 @@ export function AdminSettingsPage() {
         apiCall('getAuditLogs'),
         apiCall('getAccessibleNotes'),
       ]);
-      setUsers(uList || []);
-      setAuditLogs(logs || []);
-      setNotes(nList?.notes || []);
+      const usersData = Array.isArray(uList) ? uList : (Array.isArray(uList?.users) ? uList.users : []);
+      const logsData = Array.isArray(logs) ? logs : (Array.isArray(logs?.logs) ? logs.logs : []);
+      const notesData = Array.isArray(nList?.notes) ? nList.notes : (Array.isArray(nList) ? nList : []);
+      setUsers(usersData);
+      setAuditLogs(logsData);
+      setNotes(notesData);
     } catch (err) {
       toast.error('Failed to load system settings.');
     } finally {
@@ -174,7 +177,7 @@ export function AdminSettingsPage() {
           }
         >
           <div className="space-y-3">
-            {notes.map((n) => (
+            {(Array.isArray(notes) ? notes : []).map((n) => (
               <div key={n.id} className="p-4 rounded-xl border border-gray-200 bg-white flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <BookOpen className="w-6 h-6 text-brand-700 shrink-0" />
