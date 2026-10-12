@@ -17,6 +17,8 @@ import {
   Lock,
   PlusCircle,
   Sparkles,
+  UserPlus,
+  RefreshCw,
 } from 'lucide-react';
 
 export function AdminSettingsPage() {
@@ -34,6 +36,52 @@ export function AdminSettingsPage() {
     file_type: 'PDF',
     file_url: '',
   });
+
+  // New Staff Modal
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
+  const [staffForm, setStaffForm] = useState({
+    full_name: '',
+    email: '',
+    mobile: '',
+    role: 'OPS_EXEC',
+    department: 'Operations',
+    trainer_id: '',
+    password: '',
+  });
+
+  const roleDepartmentMap = {
+    MAIN_ADMIN: 'Management',
+    OPS_ADMIN: 'Operations',
+    OPS_EXEC: 'Operations',
+    SALES_HEAD: 'Sales',
+    SALES_EXEC: 'Sales',
+    MARKETING_HEAD: 'Marketing',
+    SOCIAL_MEDIA_MANAGER: 'Marketing',
+    VIDEO_EDITOR: 'Marketing',
+    POSTER_DESIGNER: 'Marketing',
+    PLACEMENT_ADMIN: 'Placement Cell',
+    TRAINER: 'Academics',
+    HR: 'Human Resources',
+    OFFICE_ADMIN: 'Administration',
+  };
+
+  const handleGeneratePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let pass = 'Mst@';
+    for (let i = 0; i < 6; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setStaffForm(prev => ({ ...prev, password: pass }));
+  };
+
+  const handleRoleChange = (newRole) => {
+    setStaffForm(prev => ({
+      ...prev,
+      role: newRole,
+      department: roleDepartmentMap[newRole] || 'General',
+      trainer_id: newRole === 'TRAINER' ? (prev.trainer_id || 'TR-' + Math.floor(100 + Math.random() * 900)) : ''
+    }));
+  };
 
   const toast = useToast();
 
@@ -75,6 +123,31 @@ export function AdminSettingsPage() {
     }
   };
 
+  const handleSaveStaff = async (e) => {
+    e.preventDefault();
+    if (!staffForm.password) {
+      toast.error('Please generate or provide a password for this staff member!');
+      return;
+    }
+    try {
+      await apiCall('createStaffUser', staffForm);
+      toast.success(`Staff account created successfully for ${staffForm.full_name}! Password: ${staffForm.password}`);
+      setStaffModalOpen(false);
+      setStaffForm({
+        full_name: '',
+        email: '',
+        mobile: '',
+        role: 'OPS_EXEC',
+        department: 'Operations',
+        trainer_id: '',
+        password: '',
+      });
+      loadSettingsData();
+    } catch (err) {
+      toast.error(err.message || 'Failed to create staff account.');
+    }
+  };
+
   const userCols = [
     { header: 'Full Name', accessor: 'full_name' },
     { header: 'Username / Email', accessor: 'email' },
@@ -112,7 +185,7 @@ export function AdminSettingsPage() {
           }`}
         >
           <Users className="w-4 h-4 text-gold-400" />
-          Users & Trainer IDs
+          Users & Faculty
         </button>
         <button
           onClick={() => setActiveTab('NOTES')}
@@ -154,7 +227,23 @@ export function AdminSettingsPage() {
 
       {/* 1. USERS & TRAINER IDS */}
       {activeTab === 'USERS' && (
-        <Card title="System Users & Faculty Credentials" subtitle="Manage accounts, trainer IDs, and role assignments">
+        <Card
+          title="System Users & Faculty Credentials"
+          subtitle="Manage accounts, faculty credentials, and role assignments"
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              icon={UserPlus}
+              onClick={() => {
+                handleGeneratePassword();
+                setStaffModalOpen(true);
+              }}
+            >
+              Add New Staff User
+            </Button>
+          }
+        >
           <Table
             columns={userCols}
             data={users}
@@ -366,6 +455,152 @@ Joining Date: {{JOINING_DATE}}`}
             </Button>
             <Button type="submit" variant="primary" size="md">
               Upload & Save
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add New Staff Account Modal */}
+      <Modal
+        isOpen={staffModalOpen}
+        onClose={() => setStaffModalOpen(false)}
+        title="Add New Staff or Faculty Member"
+        subtitle="Provision official account credentials with role governance"
+      >
+        <form onSubmit={handleSaveStaff} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Adheela Fathima"
+                value={staffForm.full_name}
+                onChange={(e) => setStaffForm({ ...staffForm, full_name: e.target.value })}
+                className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Official Email Address *
+              </label>
+              <input
+                type="email"
+                required
+                placeholder="e.g. adheelafathima8@gmail.com"
+                value={staffForm.email}
+                onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+                className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-medium"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Assigned Role *
+              </label>
+              <select
+                value={staffForm.role}
+                onChange={(e) => handleRoleChange(e.target.value)}
+                className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-bold text-brand-900"
+              >
+                <option value="MAIN_ADMIN">Main Admin (Executive Director)</option>
+                <option value="OPS_ADMIN">Operations Admin</option>
+                <option value="OPS_EXEC">Operations Executive</option>
+                <option value="SALES_HEAD">Sales Head</option>
+                <option value="SALES_EXEC">Sales Executive</option>
+                <option value="MARKETING_HEAD">Marketing Head</option>
+                <option value="SOCIAL_MEDIA_MANAGER">Social Media Manager</option>
+                <option value="VIDEO_EDITOR">Video Editor</option>
+                <option value="POSTER_DESIGNER">Poster Designer</option>
+                <option value="PLACEMENT_ADMIN">Placement Admin</option>
+                <option value="TRAINER">Faculty Trainer</option>
+                <option value="HR">HR Coordinator</option>
+                <option value="OFFICE_ADMIN">Office Administrator</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Department *
+              </label>
+              <input
+                type="text"
+                required
+                value={staffForm.department}
+                onChange={(e) => setStaffForm({ ...staffForm, department: e.target.value })}
+                className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-medium"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                Contact Number (Mobile)
+              </label>
+              <input
+                type="tel"
+                placeholder="e.g. 9847000000"
+                value={staffForm.mobile}
+                onChange={(e) => setStaffForm({ ...staffForm, mobile: e.target.value })}
+                className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-mono"
+              />
+            </div>
+
+            {staffForm.role === 'TRAINER' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                  Trainer ID *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. TR-105"
+                  value={staffForm.trainer_id}
+                  onChange={(e) => setStaffForm({ ...staffForm, trainer_id: e.target.value })}
+                  className="w-full p-2.5 text-xs bg-white border border-gray-200 rounded-xl font-mono font-bold text-gold-600"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="p-3 bg-brand-50/50 rounded-xl border border-brand-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-brand-900 uppercase tracking-wider">
+                Admin-Generated Password *
+              </label>
+              <button
+                type="button"
+                onClick={handleGeneratePassword}
+                className="text-xs font-bold text-brand-600 hover:text-brand-800 flex items-center gap-1"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Generate Random
+              </button>
+            </div>
+            <input
+              type="text"
+              required
+              value={staffForm.password}
+              onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+              className="w-full p-2.5 text-xs bg-white border border-brand-300 rounded-xl font-mono font-bold text-brand-900 tracking-wider"
+              placeholder="e.g. Mst@7x9K#q"
+            />
+            <p className="text-[11px] text-gray-500">
+              Provide this password to the staff member. They will use their Email + this password to log in.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+            <Button variant="secondary" size="md" onClick={() => setStaffModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" size="md">
+              Create Staff Account
             </Button>
           </div>
         </form>

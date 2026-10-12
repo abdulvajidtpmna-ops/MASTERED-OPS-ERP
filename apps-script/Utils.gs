@@ -303,8 +303,10 @@ function migrate_v2() {
     Payments: ['id', 'student_id', 'installment_id', 'amount', 'due_month', 'paid_month', 'sales_staff_id', 'payment_mode', 'reference_no', 'payment_date', 'collected_by', 'receipt_no', 'receipt_url', 'remarks', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
     Timetable: ['id', 'batch_id', 'date', 'slot', 'module_code', 'topic_id', 'trainer_id', 'room', 'locked', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
     TimetableLog: ['id', 'timetable_id', 'batch_id', 'date', 'slot', 'old_values_json', 'new_values_json', 'changed_by', 'changed_at', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
-    SalesDailyCounts: ['id', 'staff_id', 'date', 'leads', 'qualified', 'interested', 'bucket_new', 'bucket_lost', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
-    Incentives: ['id', 'staff_id', 'month', 'collections_total', 'incentive_amount', 'deductions_amount', 'net_incentive', 'details_json', 'calculated_at', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted']
+    Incentives: ['id', 'staff_id', 'month', 'collections_total', 'incentive_amount', 'deductions_amount', 'net_incentive', 'details_json', 'calculated_at', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    DailyToDos: ['id', 'user_id', 'user_name', 'user_role', 'department', 'date', 'created_before_10am', 'updated_before_9pm', 'tasks_json', 'notes', 'status', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    SocialPosts: ['id', 'title', 'post_url', 'caption', 'created_by_name', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted'],
+    SocialEngagements: ['id', 'post_id', 'user_id', 'user_name', 'user_role', 'created_at', 'created_by', 'updated_at', 'updated_by', 'is_deleted']
   };
 
   // Ensure tabs & columns exist

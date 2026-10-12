@@ -14,10 +14,15 @@ import {
   MessageSquare,
   ShieldCheck,
   Filter,
+  Instagram,
+  Sun,
+  Clock,
 } from 'lucide-react';
 
 export function HRReviewPage() {
   const [reviewData, setReviewData] = useState({ staff: [], total_staff: 0 });
+  const [socialData, setSocialData] = useState(null);
+  const [toDoData, setToDoData] = useState(null);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [rating, setRating] = useState(5);
@@ -30,11 +35,17 @@ export function HRReviewPage() {
   const loadHRData = async () => {
     try {
       setLoading(true);
-      const res = await apiCall('getHRStaffReviewData');
+      const [res, socialRes, todoRes] = await Promise.all([
+        apiCall('getHRStaffReviewData'),
+        apiCall('getSocialEngagementReport'),
+        apiCall('getAllStaffToDos'),
+      ]);
       setReviewData({
         staff: Array.isArray(res?.staff) ? res.staff : [],
         total_staff: res?.total_staff || (Array.isArray(res?.staff) ? res.staff.length : 0),
       });
+      setSocialData(socialRes);
+      setToDoData(todoRes);
     } catch (err) {
       toast.error('Failed to load HR staff review dashboard.');
     } finally {
@@ -144,7 +155,7 @@ export function HRReviewPage() {
         </div>
       </div>
 
-      <Card>
+      <Card title="Staff Daily Performance Matrix" subtitle="Audit duty completion, missed tasks, and supervisor ratings">
         <Table
           columns={columns}
           data={reviewData.staff}
@@ -152,6 +163,89 @@ export function HRReviewPage() {
           exportFileName="Staff_Performance_Review.csv"
           pageSize={10}
         />
+      </Card>
+
+      {/* Mandatory Instagram Engagement Audit */}
+      <Card
+        title="Mandatory Instagram Engagement Audit (Done vs Pending)"
+        subtitle="Verification of official post likes & comments across all department personnel"
+      >
+        <div className="space-y-4">
+          {Array.isArray(socialData?.reports) && socialData.reports.length > 0 ? (
+            socialData.reports.map((post) => (
+              <div key={post.post_id} className="p-4 rounded-xl border border-gray-200 bg-white space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Instagram className="w-5 h-5 text-pink-600 shrink-0" />
+                    <div>
+                      <h4 className="font-poppins font-bold text-xs text-brand-900">{post.title}</h4>
+                      <span className="text-[10px] text-gray-400">Published {new Date(post.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={post.post_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[11px] font-bold rounded-lg flex items-center gap-1 shadow-sm hover:opacity-90"
+                    >
+                      View Link <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="text-xs font-bold bg-emerald-50 text-emerald-800 px-2 py-1 rounded-lg border border-emerald-200">
+                      Overall Done: {post.done_count} / {post.total_required}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200">
+                    <span className="font-bold text-emerald-900 block text-[11px] mb-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed Staff ({post.done_staff.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {post.done_staff.length > 0 ? (
+                        post.done_staff.map((s) => (
+                          <span
+                            key={s.id}
+                            className="px-2 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200 text-[10px] font-semibold"
+                          >
+                            ✓ {s.name} ({s.role})
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 italic text-[11px]">No staff completed yet.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-200">
+                    <span className="font-bold text-rose-900 block text-[11px] mb-1.5 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600" /> Pending Staff ({post.pending_staff.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {post.pending_staff.length > 0 ? (
+                        post.pending_staff.map((s) => (
+                          <span
+                            key={s.id}
+                            className="px-2 py-0.5 rounded bg-white text-rose-700 border border-rose-200 text-[10px] font-semibold"
+                          >
+                            ⚠️ {s.name} ({s.role})
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-emerald-700 font-bold text-[11px]">🎉 100% staff engaged!</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-4 text-center text-xs text-gray-500">
+              No mandatory Instagram posts registered yet.
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Review Modal */}

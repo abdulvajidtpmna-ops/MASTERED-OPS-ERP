@@ -319,17 +319,21 @@ function seedInitialUsers() {
   var defaultPassHash = hashSecret(salt, 'Mastered@2026');
 
   var users = [
-    { username: 'admin@mastered.in', email: 'admin@mastered.in', mobile: '9847000001', full_name: 'Director (Main Admin)', role: 'MAIN_ADMIN', department: 'Management' },
-    { username: 'ops@mastered.in', email: 'ops@mastered.in', mobile: '9847000002', full_name: 'Suresh Kumar', role: 'OPS_ADMIN', department: 'Operations' },
-    { username: 'opsexec@mastered.in', email: 'opsexec@mastered.in', mobile: '9847000003', full_name: 'Fathima Nasrin', role: 'OPS_EXEC', department: 'Operations' },
-    { username: 'office@mastered.in', email: 'office@mastered.in', mobile: '9847000004', full_name: 'Anjali Ramesh', role: 'OFFICE_ADMIN', department: 'Administration' },
-    { username: 'placement@mastered.in', email: 'placement@mastered.in', mobile: '9847000005', full_name: 'Vipin Das', role: 'PLACEMENT_ADMIN', department: 'Placement Cell' },
-    { username: 'hr@mastered.in', email: 'hr@mastered.in', mobile: '9847000006', full_name: 'Deepa Menon', role: 'HR', department: 'Human Resources' },
-    { username: 'marketinghead@mastered.in', email: 'marketinghead@mastered.in', mobile: '9847000007', full_name: 'Shahbaz K', role: 'DEPT_HEAD', department: 'Marketing' },
-    { username: 'saleshead@mastered.in', email: 'saleshead@mastered.in', mobile: '9847000008', full_name: 'Farhan A', role: 'DEPT_HEAD', department: 'Sales' },
-    { username: 'sales1@mastered.in', email: 'sales1@mastered.in', mobile: '9847000009', full_name: 'Ajeesha M', role: 'STAFF', department: 'Sales' },
-    { username: 'vajid@mastered.in', email: 'vajid@mastered.in', mobile: '9847000010', full_name: 'Vajid Trainer', role: 'TRAINER', department: 'Academics', trainer_id: 'TR-101' },
-    { username: 'anoop@mastered.in', email: 'anoop@mastered.in', mobile: '9847000011', full_name: 'Dr. Anoop Nair', role: 'TRAINER', department: 'Healthcare Academics', trainer_id: 'TR-102' }
+    { username: 'farhan.mankave@gmail.com', email: 'farhan.mankave@gmail.com', mobile: '9847000001', full_name: 'Farhan', role: 'MAIN_ADMIN', department: 'Management' },
+    { username: 'ceomsacademy@gmail.com', email: 'ceomsacademy@gmail.com', mobile: '9847000002', full_name: 'Rasheed', role: 'OPS_ADMIN', department: 'Operations' },
+    { username: 'qualitymastered25@gmail.com', email: 'qualitymastered25@gmail.com', mobile: '9847000003', full_name: 'Zahad', role: 'OPS_EXEC', department: 'Operations' },
+    { username: 'ashifirkkur111@gmail.com', email: 'ashifirkkur111@gmail.com', mobile: '9847000004', full_name: 'Ashif (Sales Head)', role: 'SALES_HEAD', department: 'Sales', staff_id: 'SH-01' },
+    { username: 'safnasafnat2001@gmail.com', email: 'safnasafnat2001@gmail.com', mobile: '9847000005', full_name: 'Safna', role: 'SALES_EXEC', department: 'Sales', staff_id: 'ST-01' },
+    { username: 'fasnaofficialsales@gmail.com', email: 'fasnaofficialsales@gmail.com', mobile: '9847000006', full_name: 'Fasna', role: 'SALES_EXEC', department: 'Sales', staff_id: 'ST-02' },
+    { username: 'Shabanashababasha@gmail.com', email: 'Shabanashababasha@gmail.com', mobile: '9847000007', full_name: 'Shabana', role: 'SALES_EXEC', department: 'Sales', staff_id: 'ST-03' },
+    { username: 'shahabasbinriyas@gmail.com', email: 'shahabasbinriyas@gmail.com', mobile: '9847000008', full_name: 'Shahabas', role: 'MARKETING_HEAD', department: 'Marketing' },
+    { username: 'Shahalcalicut86@gmail.com', email: 'Shahalcalicut86@gmail.com', mobile: '9847000009', full_name: 'Shahal', role: 'SOCIAL_MEDIA_MANAGER', department: 'Marketing' },
+    { username: 'adheelafathima8@gmail.com', email: 'adheelafathima8@gmail.com', mobile: '9847000010', full_name: 'Adheela', role: 'VIDEO_EDITOR', department: 'Marketing' },
+    { username: 'vvgayathri22@gmail.com', email: 'vvgayathri22@gmail.com', mobile: '9847000011', full_name: 'Gayathri', role: 'POSTER_DESIGNER', department: 'Marketing' },
+    { username: 'ashif.placement@mastered.in', email: 'ashifirkkur111@gmail.com', mobile: '9847000004', full_name: 'Ashif Irikkur (Placement)', role: 'PLACEMENT_ADMIN', department: 'Placement Cell' },
+    { username: 'trainer@mastered.in', email: 'trainer@mastered.in', mobile: '9847000012', full_name: 'Faculty Trainer', role: 'TRAINER', department: 'Academics', trainer_id: 'TR-101' },
+    { username: 'hr@mastered.in', email: 'hr@mastered.in', mobile: '9847000013', full_name: 'HR Coordinator', role: 'HR', department: 'Human Resources' },
+    { username: 'office@mastered.in', email: 'office@mastered.in', mobile: '9847000014', full_name: 'Office Admin', role: 'OFFICE_ADMIN', department: 'Administration' }
   ];
 
   for (var u = 0; u < users.length; u++) {

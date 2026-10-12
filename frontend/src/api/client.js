@@ -875,8 +875,243 @@ function executeMockAction(action, payload, token) {
       };
     }
 
-    default:
-      console.warn('Unhandled mock action:', action, payload);
+    case 'createStaffUser': {
+      const newUser = {
+        id: 'usr-' + Date.now(),
+        username: payload.email,
+        email: payload.email,
+        mobile: payload.mobile || '',
+        full_name: payload.full_name,
+        role: payload.role,
+        department: payload.department,
+        trainer_id: payload.trainer_id || '',
+        staff_id: payload.staff_id || ('ST-' + ((db.users || []).length + 1)),
+        password: payload.password || 'Mastered@2026',
+        created_at: new Date().toISOString()
+      };
+      if (!db.users) db.users = [];
+      db.users.push(newUser);
+      if (!db.auditLogs) db.auditLogs = [];
+      db.auditLogs.push({
+        id: 'aud-' + Date.now(),
+        action: 'CREATE_STAFF_USER',
+        entity: 'Users',
+        entity_id: newUser.id,
+        details: `Staff user ${newUser.full_name} (${newUser.email}) created with role ${newUser.role}`,
+        actor_role: currentUser.role,
+        created_at: new Date().toISOString(),
+        created_by: currentUser.id
+      });
+      saveMockDb(db);
+      return { success: true, user: newUser };
+    }
+
+    case 'getDailyToDos': {
+      const todayStr = (payload.date || new Date().toISOString().substring(0, 10));
+      const targetUserId = payload.user_id || currentUser.id;
+      if (!db.dailyToDos) db.dailyToDos = [];
+      const userTodayRecord = db.dailyToDos.find(t => t.user_id === targetUserId && t.date === todayStr);
+      return {
+        date: todayStr,
+        is_sunday: new Date(todayStr).getDay() === 0,
+        record: userTodayRecord || null
+      };
+    }
+
+    case 'saveDailyToDos': {
+      const todayStr = new Date().toISOString().substring(0, 10);
+      const isSunday = new Date().getDay() === 0;
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const isBefore10Am = (hour < 10) || (hour === 10 && minute === 0);
+
+      if (!db.dailyToDos) db.dailyToDos = [];
+      let record = db.dailyToDos.find(t => t.user_id === currentUser.id && t.date === todayStr);
+
+      if (record) {
+        record.tasks = payload.tasks || [];
+        record.notes = payload.notes || record.notes || '';
+      } else {
+        record = {
+          id: 'todo-' + Date.now(),
+          user_id: currentUser.id,
+          user_name: currentUser.full_name,
+          user_role: currentUser.role,
+          department: currentUser.department,
+          date: todayStr,
+          created_at: now.toISOString(),
+          created_before_10am: isBefore10Am,
+          updated_before_9pm: null,
+          tasks: payload.tasks || [],
+          status: 'IN_PROGRESS',
+          notes: payload.notes || ''
+        };
+        db.dailyToDos.push(record);
+      }
+      saveMockDb(db);
+      return { success: true, record };
+    }
+
+    case 'updateDailyToDos': {
+      const todayStr = new Date().toISOString().substring(0, 10);
+      const now = new Date();
+      const hour = now.getHours();
+      const isBefore9Pm = hour < 21;
+
+      if (!db.dailyToDos) db.dailyToDos = [];
+      let record = db.dailyToDos.find(t => t.user_id === currentUser.id && t.date === todayStr);
+
+      if (!record) {
+        record = {
+          id: 'todo-' + Date.now(),
+          user_id: currentUser.id,
+          user_name: currentUser.full_name,
+          user_role: currentUser.role,
+          department: currentUser.department,
+          date: todayStr,
+          created_at: now.toISOString(),
+          created_before_10am: false,
+          updated_before_9pm: isBefore9Pm,
+          updated_at: now.toISOString(),
+          tasks: payload.tasks || [],
+          status: 'COMPLETED',
+          notes: payload.notes || ''
+        };
+        db.dailyToDos.push(record);
+      } else {
+        record.tasks = payload.tasks || record.tasks;
+        record.notes = payload.notes !== undefined ? payload.notes : record.notes;
+        record.updated_at = now.toISOString();
+        record.updated_before_9pm = isBefore9Pm;
+        const allDone = (record.tasks || []).length > 0 && record.tasks.every(t => t.status === 'DONE');
+        record.status = allDone ? 'COMPLETED' : 'IN_PROGRESS';
+      }
+      saveMockDb(db);
+      return { success: true, record };
+    }
+
+    case 'getAllStaffToDos': {
+      const todayStr = (payload.date || new Date().toISOString().substring(0, 10));
+      const staffList = (db.users || []).filter(u => u.role !== 'STUDENT');
+      if (!db.dailyToDos) db.dailyToDos = [];
+
+      const reports = staffList.map(staff => {
+        const record = db.dailyToDos.find(t => t.user_id === staff.id && t.date === todayStr);
+        const tasks = record?.tasks || [];
+        const doneTasks = tasks.filter(t => t.status === 'DONE');
+        return {
+          user_id: staff.id,
+          full_name: staff.full_name,
+          email: staff.email,
+          role: staff.role,
+          department: staff.department,
+          has_submitted: !!record,
+          created_at: record?.created_at || null,
+          created_before_10am: record ? record.created_before_10am : false,
+          updated_at: record?.updated_at || null,
+          updated_before_9pm: record ? record.updated_before_9pm : null,
+          total_tasks: tasks.length,
+          done_tasks: doneTasks.length,
+          completion_pct: tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0,
+          tasks: tasks,
+          notes: record?.notes || ''
+        };
+      });
+
+      const totalActive = staffList.length;
+      const submittedCount = reports.filter(r => r.has_submitted).length;
+      const onTime10AmCount = reports.filter(r => r.created_before_10am).length;
+      const onTime9PmCount = reports.filter(r => r.updated_before_9pm).length;
+
+      return {
+        date: todayStr,
+        is_sunday: new Date(todayStr).getDay() === 0,
+        summary: {
+          total_staff: totalActive,
+          submitted_count: submittedCount,
+          on_time_10am_count: onTime10AmCount,
+          on_time_9pm_count: onTime9PmCount,
+          compliance_10am_pct: totalActive > 0 ? Math.round((onTime10AmCount / totalActive) * 100) : 0
+        },
+        staff_reports: reports
+      };
+    }
+
+    case 'getSocialPosts': {
+      if (!db.socialPosts) db.socialPosts = [];
+      if (!db.socialEngagements) db.socialEngagements = [];
+
+      const posts = db.socialPosts.map(p => {
+        const engagement = db.socialEngagements.find(e => e.post_id === p.id && e.user_id === currentUser.id);
+        return {
+          ...p,
+          is_done: !!engagement,
+          engaged_at: engagement ? engagement.created_at : null
+        };
+      });
+      return { posts: posts.reverse() };
+    }
+
+    case 'createSocialPost': {
+      if (!db.socialPosts) db.socialPosts = [];
+      const newPost = {
+        id: 'sp-' + Date.now(),
+        title: payload.title,
+        post_url: payload.post_url,
+        caption: payload.caption || 'Mandatory: Like and positive comments by all staff members.',
+        created_by: currentUser.id,
+        created_by_name: currentUser.full_name,
+        created_at: new Date().toISOString()
+      };
+      db.socialPosts.push(newPost);
+      saveMockDb(db);
+      return { success: true, post: newPost };
+    }
+
+    case 'markSocialPostDone': {
+      if (!db.socialEngagements) db.socialEngagements = [];
+      const existing = db.socialEngagements.find(e => e.post_id === payload.post_id && e.user_id === currentUser.id);
+      if (!existing) {
+        db.socialEngagements.push({
+          id: 'seng-' + Date.now(),
+          post_id: payload.post_id,
+          user_id: currentUser.id,
+          user_name: currentUser.full_name,
+          user_role: currentUser.role,
+          created_at: new Date().toISOString()
+        });
+        saveMockDb(db);
+      }
       return { success: true };
+    }
+
+    case 'getSocialEngagementReport': {
+      if (!db.socialPosts) db.socialPosts = [];
+      if (!db.socialEngagements) db.socialEngagements = [];
+      const staffList = (db.users || []).filter(u => u.role !== 'STUDENT' && u.role !== 'MAIN_ADMIN');
+
+      const reports = db.socialPosts.map(post => {
+        const engagements = db.socialEngagements.filter(e => e.post_id === post.id);
+        const engagedUserIds = new Set(engagements.map(e => e.user_id));
+
+        const doneStaff = staffList.filter(s => engagedUserIds.has(s.id));
+        const pendingStaff = staffList.filter(s => !engagedUserIds.has(s.id));
+
+        return {
+          post_id: post.id,
+          title: post.title,
+          post_url: post.post_url,
+          created_at: post.created_at,
+          total_required: staffList.length,
+          done_count: doneStaff.length,
+          pending_count: pendingStaff.length,
+          done_staff: doneStaff.map(s => ({ id: s.id, name: s.full_name, role: s.role, department: s.department })),
+          pending_staff: pendingStaff.map(s => ({ id: s.id, name: s.full_name, role: s.role, department: s.department }))
+        };
+      });
+
+      return { reports: reports.reverse(), total_staff: staffList.length };
+    }
   }
 }

@@ -29,7 +29,7 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) 
   const navItems = [
     { to: '/dashboard/main', label: 'Main Dashboard', icon: LayoutDashboard, roles: ['MAIN_ADMIN'] },
     { to: '/dashboard/ops', label: 'Operations Dashboard', icon: LayoutDashboard, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC'] },
-    { to: '/admissions', label: 'Admissions & Sales', icon: Users, roles: ['OPS_ADMIN', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN'] },
+    { to: '/admissions', label: 'Admissions & Sales', icon: Users, roles: ['MAIN_ADMIN', 'SALES_HEAD', 'SALES_EXEC', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN'] },
     { to: '/after-sales', label: 'After-Sales & Assign', icon: PhoneCall, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC'] },
     { to: '/batches', label: 'Batches Management', icon: CalendarDays, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC', 'OFFICE_ADMIN'] },
     { to: '/timetable', label: 'Daily Timetable Grid', icon: Clock, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'OPS_EXEC'] },
@@ -38,9 +38,13 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) 
     { to: '/placement', label: 'Placement Tracker', icon: Briefcase, roles: ['MAIN_ADMIN', 'PLACEMENT_ADMIN'] },
     { to: '/trainer', label: 'Trainer Console', icon: GraduationCap, roles: ['TRAINER'] },
     { to: '/student', label: 'Student Portal', icon: GraduationCap, roles: ['STUDENT'] },
-    { to: '/duties', label: 'My Duties & KPI', icon: ListTodo, roles: ['HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC', 'PLACEMENT_ADMIN'] },
-    { to: '/hr-review', label: 'HR Performance Review', icon: UserCheck, roles: ['MAIN_ADMIN', 'HR', 'DEPT_HEAD'] },
-    { to: '/settings', label: 'Admin Settings', icon: Settings, roles: ['MAIN_ADMIN'] },
+    { to: '/duties', label: 'My Duties & Tasks', icon: ListTodo, roles: [
+      'MAIN_ADMIN', 'HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC',
+      'PLACEMENT_ADMIN', 'SALES_HEAD', 'SALES_EXEC', 'MARKETING_HEAD',
+      'SOCIAL_MEDIA_MANAGER', 'VIDEO_EDITOR', 'POSTER_DESIGNER', 'TRAINER', 'OPS_ADMIN'
+    ] },
+    { to: '/hr-review', label: 'HR Staff Review', icon: UserCheck, roles: ['MAIN_ADMIN', 'HR', 'DEPT_HEAD', 'MARKETING_HEAD', 'SALES_HEAD'] },
+    { to: '/settings', label: 'Staff & ERP Settings', icon: Settings, roles: ['MAIN_ADMIN', 'OPS_ADMIN', 'HR'] },
   ];
 
   const allowedNav = navItems.filter((item) => item.roles.includes(role));
@@ -135,16 +139,21 @@ export function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) 
               }}
               className="w-full bg-brand-900 border border-brand-700 text-xs text-gold-300 rounded-lg p-1.5 focus:outline-none focus:ring-1 focus:ring-gold-500 font-bold"
             >
-              <option value="MAIN_ADMIN">MAIN_ADMIN (Director)</option>
-              <option value="OPS_ADMIN">OPS_ADMIN (Suresh)</option>
-              <option value="OPS_EXEC">OPS_EXEC (Fathima)</option>
-              <option value="OFFICE_ADMIN">OFFICE_ADMIN (Anjali)</option>
-              <option value="PLACEMENT_ADMIN">PLACEMENT_ADMIN (Vipin)</option>
-              <option value="HR">HR (Deepa)</option>
-              <option value="DEPT_HEAD">DEPT_HEAD (Marketing)</option>
-              <option value="STAFF">STAFF (Sales - Ajeesha)</option>
-              <option value="TRAINER">TRAINER (Vajid)</option>
-              <option value="STUDENT">STUDENT (Rahul)</option>
+              <option value="MAIN_ADMIN">Farhan (Main Admin)</option>
+              <option value="OPS_ADMIN">Rasheed (Operations Admin)</option>
+              <option value="OPS_EXEC">Zahad (Operations Executive)</option>
+              <option value="SALES_HEAD">Ashif (Sales Head)</option>
+              <option value="SALES_EXEC_1">Safna (Sales Executive)</option>
+              <option value="SALES_EXEC_2">Fasna (Sales Executive)</option>
+              <option value="SALES_EXEC_3">Shabana (Sales Executive)</option>
+              <option value="MARKETING_HEAD">Shahabas (Marketing Head)</option>
+              <option value="SOCIAL_MEDIA_MANAGER">Shahal (Social Media)</option>
+              <option value="VIDEO_EDITOR">Adheela (Video Editor)</option>
+              <option value="POSTER_DESIGNER">Gayathri (Poster Designer)</option>
+              <option value="PLACEMENT_ADMIN">Ashif Irikkur (Placement)</option>
+              <option value="TRAINER">Faculty Trainer</option>
+              <option value="HR">HR Coordinator</option>
+              <option value="OFFICE_ADMIN">Office Admin</option>
             </select>
           </div>
         )}

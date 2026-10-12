@@ -89,7 +89,7 @@ export function App() {
         <Route
           path="/admissions"
           element={
-            <RoleRoute allowedRoles={['OPS_ADMIN', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN']}>
+            <RoleRoute allowedRoles={['MAIN_ADMIN', 'SALES_HEAD', 'SALES_EXEC', 'STAFF', 'DEPT_HEAD', 'OFFICE_ADMIN']}>
               <AdmissionsPage />
             </RoleRoute>
           }
@@ -179,7 +179,11 @@ export function App() {
         <Route
           path="/duties"
           element={
-            <RoleRoute allowedRoles={['HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC', 'PLACEMENT_ADMIN']}>
+            <RoleRoute allowedRoles={[
+              'MAIN_ADMIN', 'HR', 'DEPT_HEAD', 'STAFF', 'OFFICE_ADMIN', 'OPS_EXEC',
+              'PLACEMENT_ADMIN', 'SALES_HEAD', 'SALES_EXEC', 'MARKETING_HEAD',
+              'SOCIAL_MEDIA_MANAGER', 'VIDEO_EDITOR', 'POSTER_DESIGNER', 'TRAINER', 'OPS_ADMIN'
+            ]}>
               <DutiesPage />
             </RoleRoute>
           }
@@ -189,7 +193,7 @@ export function App() {
         <Route
           path="/hr-review"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN', 'HR', 'DEPT_HEAD']}>
+            <RoleRoute allowedRoles={['MAIN_ADMIN', 'HR', 'DEPT_HEAD', 'MARKETING_HEAD', 'SALES_HEAD']}>
               <HRReviewPage />
             </RoleRoute>
           }
@@ -199,7 +203,7 @@ export function App() {
         <Route
           path="/settings"
           element={
-            <RoleRoute allowedRoles={['MAIN_ADMIN']}>
+            <RoleRoute allowedRoles={['MAIN_ADMIN', 'OPS_ADMIN', 'HR']}>
               <AdminSettingsPage />
             </RoleRoute>
           }

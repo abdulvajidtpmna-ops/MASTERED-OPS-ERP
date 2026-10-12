@@ -28,6 +28,7 @@ import {
 export function AdmissionsPage() {
   const { user } = useAuth();
   const isExecutive = ['MAIN_ADMIN', 'HR', 'DEPT_HEAD', 'OFFICE_ADMIN', 'OPS_ADMIN'].includes(user?.role);
+  const isSalesStaff = ['SALES_HEAD', 'SALES_EXEC', 'STAFF', 'MAIN_ADMIN'].includes(user?.role) || user?.department === 'Sales';
 
   const [activeTab, setActiveTab] = useState('NEW_ADMISSION'); // NEW_ADMISSION | DAILY_COUNTS | MY_INCENTIVES
   const [selectedStaffId, setSelectedStaffId] = useState(user?.staff_id || user?.id || 'ST-01');
@@ -258,28 +259,32 @@ export function AdmissionsPage() {
           <UserPlus className="w-4 h-4 text-gold-400" />
           🎓 Admissions Registry ({admissions.length})
         </button>
-        <button
-          onClick={() => setActiveTab('DAILY_COUNTS')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'DAILY_COUNTS'
-              ? 'bg-brand-900 text-white shadow-sm'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <Target className="w-4 h-4 text-gold-400" />
-          🎯 Daily Lead Counts & Bucket List Report
-        </button>
-        <button
-          onClick={() => setActiveTab('MY_INCENTIVES')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'MY_INCENTIVES'
-              ? 'bg-brand-900 text-white shadow-sm'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <IndianRupee className="w-4 h-4 text-gold-400" />
-          💰 My Incentive & My Students
-        </button>
+        {isSalesStaff && (
+          <>
+            <button
+              onClick={() => setActiveTab('DAILY_COUNTS')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                activeTab === 'DAILY_COUNTS'
+                  ? 'bg-brand-900 text-white shadow-sm'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              <Target className="w-4 h-4 text-gold-400" />
+              🎯 Daily Lead Counts & Bucket List Report
+            </button>
+            <button
+              onClick={() => setActiveTab('MY_INCENTIVES')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                activeTab === 'MY_INCENTIVES'
+                  ? 'bg-brand-900 text-white shadow-sm'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              <IndianRupee className="w-4 h-4 text-gold-400" />
+              💰 My Incentive & My Students
+            </button>
+          </>
+        )}
       </div>
 
       {/* =========================================================================

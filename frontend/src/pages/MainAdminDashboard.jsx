@@ -18,6 +18,10 @@ import {
   Clock,
   CheckCircle2,
   Layers,
+  Instagram,
+  ExternalLink,
+  Sun,
+  ListTodo,
 } from 'lucide-react';
 
 export function MainAdminDashboard() {
@@ -27,23 +31,29 @@ export function MainAdminDashboard() {
   const [placementData, setPlacementData] = useState(null);
   const [attendanceData, setAttendanceData] = useState(null);
   const [topicsReport, setTopicsReport] = useState(null);
+  const [staffToDosData, setStaffToDosData] = useState(null);
+  const [socialEngagementData, setSocialEngagementData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [fees, batchList, placement, attOverview, topicsRes] = await Promise.all([
+        const [fees, batchList, placement, attOverview, topicsRes, todosRes, socialRes] = await Promise.all([
           apiCall('getFeeAnalytics'),
           apiCall('getBatchesList'),
           apiCall('getPlacementTrackerData'),
           apiCall('getAttendanceOverview'),
           apiCall('getTopicsCoveredReport'),
+          apiCall('getAllStaffToDos'),
+          apiCall('getSocialEngagementReport'),
         ]);
         setFeeData(fees);
         setBatches(batchList || []);
         setPlacementData(placement);
         setAttendanceData(attOverview);
         setTopicsReport(topicsRes?.reports || []);
+        setStaffToDosData(todosRes);
+        setSocialEngagementData(socialRes);
       } catch (err) {
         console.error('Main Dashboard load error:', err);
       } finally {
@@ -467,6 +477,228 @@ export function MainAdminDashboard() {
             <h4 className="text-2xl font-poppins font-bold text-orange-700 mt-1">{pMetrics.status_breakdown?.NOT_NOW || 1}</h4>
             <span className="text-[10px] text-orange-600 font-medium">Postponed</span>
           </div>
+        </div>
+      </Card>
+
+      {/* (6) STAFF DAILY TO-DO COMPLIANCE & PROGRESS REPORT */}
+      <Card
+        title="6. Staff Daily To-Do Compliance & Execution Dashboard"
+        subtitle="Daily task plan submissions (Deadline: Before 10:00 AM) and end-of-day progress reviews (Deadline: Before 9:00 PM)"
+      >
+        <div className="space-y-4">
+          {staffToDosData?.is_sunday ? (
+            <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-center gap-3 text-amber-800 text-xs font-semibold">
+              <Sun className="w-5 h-5 shrink-0" />
+              <span>Today is Sunday (Institute Leave). Daily To-Do compliance is paused on Sundays.</span>
+            </div>
+          ) : (
+            <>
+              {/* Compliance Overview KPIs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-brand-50 rounded-xl border border-brand-200 text-center">
+                  <span className="text-[10px] font-bold text-brand-700 uppercase">Active Staff</span>
+                  <h4 className="text-xl font-poppins font-bold text-brand-900 mt-0.5">
+                    {staffToDosData?.summary?.total_staff || 0}
+                  </h4>
+                  <span className="text-[10px] text-gray-500">Tracking Today</span>
+                </div>
+
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase">10 AM On-Time Plan</span>
+                  <h4 className="text-xl font-poppins font-bold text-emerald-700 mt-0.5">
+                    {staffToDosData?.summary?.on_time_10am_count || 0}
+                  </h4>
+                  <span className="text-[10px] text-emerald-600 font-semibold">
+                    {staffToDosData?.summary?.compliance_10am_pct || 0}% Compliance
+                  </span>
+                </div>
+
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-200 text-center">
+                  <span className="text-[10px] font-bold text-brand-800 uppercase">Submitted Today</span>
+                  <h4 className="text-xl font-poppins font-bold text-brand-700 mt-0.5">
+                    {staffToDosData?.summary?.submitted_count || 0}
+                  </h4>
+                  <span className="text-[10px] text-brand-600 font-medium">To-Do Plans Active</span>
+                </div>
+
+                <div className="p-3 bg-teal-50 rounded-xl border border-teal-200 text-center">
+                  <span className="text-[10px] font-bold text-teal-800 uppercase">9 PM Updates Saved</span>
+                  <h4 className="text-xl font-poppins font-bold text-teal-700 mt-0.5">
+                    {staffToDosData?.summary?.on_time_9pm_count || 0}
+                  </h4>
+                  <span className="text-[10px] text-teal-600 font-medium">Evening Progress Closed</span>
+                </div>
+              </div>
+
+              {/* Staff To-Do Grid */}
+              <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-brand-900 text-white font-poppins text-[11px] uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3 font-semibold">Staff Member</th>
+                      <th className="py-2.5 px-3 font-semibold">Department & Role</th>
+                      <th className="py-2.5 px-3 font-semibold">Morning Plan (10 AM)</th>
+                      <th className="py-2.5 px-3 font-semibold">Evening Update (9 PM)</th>
+                      <th className="py-2.5 px-3 font-semibold">Tasks Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {Array.isArray(staffToDosData?.staff_reports) && staffToDosData.staff_reports.length > 0 ? (
+                      staffToDosData.staff_reports.map((staff, idx) => (
+                        <tr key={staff.user_id || idx} className="hover:bg-brand-50/40 transition-colors">
+                          <td className="py-2.5 px-3">
+                            <strong className="text-brand-900 block">{staff.full_name}</strong>
+                            <span className="text-[10px] text-gray-400 font-mono">{staff.email}</span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-semibold text-gray-700 block">{staff.department}</span>
+                            <span className="text-[10px] text-gold-600 font-bold uppercase">{staff.role}</span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {staff.has_submitted ? (
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                  staff.created_before_10am
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}
+                              >
+                                {staff.created_before_10am ? '✓ On Time (Before 10 AM)' : '⚠️ Late (After 10 AM)'}
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                ✗ Not Submitted
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {staff.updated_before_9pm !== null ? (
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                  staff.updated_before_9pm
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}
+                              >
+                                {staff.updated_before_9pm ? '✓ Updated Before 9 PM' : '⚠️ Updated Late'}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-gray-400 italic">Pending 9 PM Update</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-brand-900 text-[11px]">
+                                {staff.done_tasks} / {staff.total_tasks}
+                              </span>
+                              <div className="w-16 bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${staff.completion_pct >= 100 ? 'bg-emerald-500' : 'bg-gold-500'}`}
+                                  style={{ width: `${staff.completion_pct}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-gray-500 font-semibold">{staff.completion_pct}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="py-4 text-center text-xs text-gray-400">
+                          No staff to-do records registered yet today.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
+
+      {/* (7) MANDATORY INSTAGRAM ENGAGEMENT COMPLIANCE REPORT */}
+      <Card
+        title="7. Mandatory Instagram Engagement Compliance Report"
+        subtitle="Tracking faculty & staff engagement (Like & Comment) on official Mastered Skill Academy posts & reels"
+      >
+        <div className="space-y-4">
+          {Array.isArray(socialEngagementData?.reports) && socialEngagementData.reports.length > 0 ? (
+            socialEngagementData.reports.map((post) => (
+              <div key={post.post_id} className="p-4 rounded-xl border border-gray-200 bg-white space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Instagram className="w-5 h-5 text-pink-600 shrink-0" />
+                    <div>
+                      <h4 className="font-poppins font-bold text-xs text-brand-900">{post.title}</h4>
+                      <span className="text-[10px] text-gray-400">Published {new Date(post.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={post.post_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[11px] font-bold rounded-lg flex items-center gap-1 shadow-sm hover:opacity-90"
+                    >
+                      View Reel / Post <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="text-xs font-bold bg-emerald-50 text-emerald-800 px-2 py-1 rounded-lg border border-emerald-200">
+                      Done: {post.done_count} / {post.total_required}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  {/* Done Staff List */}
+                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200">
+                    <span className="font-bold text-emerald-900 block text-[11px] mb-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed Liked & Commented ({post.done_staff.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {post.done_staff.length > 0 ? (
+                        post.done_staff.map((s) => (
+                          <span
+                            key={s.id}
+                            className="px-2 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200 text-[10px] font-semibold"
+                          >
+                            ✓ {s.name} ({s.role})
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 italic text-[11px]">No staff completed yet.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pending Staff List */}
+                  <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-200">
+                    <span className="font-bold text-rose-900 block text-[11px] mb-1.5 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Pending Engagement ({post.pending_staff.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {post.pending_staff.length > 0 ? (
+                        post.pending_staff.map((s) => (
+                          <span
+                            key={s.id}
+                            className="px-2 py-0.5 rounded bg-white text-rose-700 border border-rose-200 text-[10px] font-semibold"
+                          >
+                            ⚠️ {s.name} ({s.role})
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-emerald-700 font-bold text-[11px]">🎉 100% staff completed!</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-6 text-center text-xs text-gray-500">
+              No mandatory Instagram posts published yet.
+            </div>
+          )}
         </div>
       </Card>
     </div>

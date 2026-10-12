@@ -245,7 +245,7 @@ function doPost(e) {
         result = { ok: true, data: settingsMap };
         break;
       case 'getUsersList':
-        requireRole(currentUser, ['MAIN_ADMIN']);
+        requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'HR']);
         var users = getTableData('Users').map(function(u) {
           return {
             id: u.id,
@@ -263,6 +263,200 @@ function doPost(e) {
         });
         result = { ok: true, data: users };
         break;
+
+      case 'createStaffUser':
+        requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'HR']);
+        var salt = 'MLC_SALT_' + Utilities.getUuid().substring(0, 8);
+        var passHash = hashSecret(salt, payload.password || 'Mastered@2026');
+        var newUser = insertRecord('Users', {
+          username: payload.email,
+          email: payload.email,
+          mobile: payload.mobile || '',
+          full_name: payload.full_name,
+          role: payload.role,
+          department: payload.department,
+          trainer_id: payload.trainer_id || '',
+          staff_id: payload.staff_id || '',
+          salt: salt,
+          password_hash: passHash,
+          failed_attempts: 0
+        }, currentUser.id);
+        logAudit('CREATE_STAFF_USER', 'Users', newUser.id, { email: payload.email, role: payload.role }, currentUser);
+        result = { ok: true, data: newUser };
+        break;
+
+      case 'getDailyToDos':
+        var targetDate = payload.date || new Date().toISOString().substring(0, 10);
+        var qId = payload.user_id || currentUser.id;
+        var todos = getTableData('DailyToDos');
+        var matchedTodo = null;
+        for (var t = 0; t < todos.length; t++) {
+          if (todos[t].user_id === qId && todos[t].date === targetDate) {
+            matchedTodo = todos[t];
+            try { matchedTodo.tasks = JSON.parse(matchedTodo.tasks_json || '[]'); } catch(e){ matchedTodo.tasks = []; }
+            break;
+          }
+        }
+        result = { ok: true, data: { date: targetDate, is_sunday: new Date(targetDate).getDay() === 0, record: matchedTodo } };
+        break;
+
+      case 'saveDailyToDos':
+        var todayStr = new Date().toISOString().substring(0, 10);
+        var isBefore10 = new Date().getHours() < 10;
+        var allTds = getTableData('DailyToDos');
+        var currRec = null;
+        for (var a = 0; a < allTds.length; a++) {
+          if (allTds[a].user_id === currentUser.id && allTds[a].date === todayStr) {
+            currRec = allTds[a];
+            break;
+          }
+        }
+        var saveObj = {
+          user_id: currentUser.id,
+          user_name: currentUser.full_name,
+          user_role: currentUser.role,
+          department: currentUser.department,
+          date: todayStr,
+          created_before_10am: isBefore10,
+          tasks_json: JSON.stringify(payload.tasks || []),
+          notes: payload.notes || '',
+          status: 'IN_PROGRESS'
+        };
+        if (currRec) {
+          updateRecord('DailyToDos', currRec.id, saveObj, currentUser.id);
+        } else {
+          insertRecord('DailyToDos', saveObj, currentUser.id);
+        }
+        result = { ok: true, data: { success: true } };
+        break;
+
+      case 'updateDailyToDos':
+        var todayStr2 = new Date().toISOString().substring(0, 10);
+        var isBefore9 = new Date().getHours() < 21;
+        var allTds2 = getTableData('DailyToDos');
+        var currRec2 = null;
+        for (var b = 0; b < allTds2.length; b++) {
+          if (allTds2[b].user_id === currentUser.id && allTds2[b].date === todayStr2) {
+            currRec2 = allTds2[b];
+            break;
+          }
+        }
+        if (currRec2) {
+          updateRecord('DailyToDos', currRec2.id, {
+            tasks_json: JSON.stringify(payload.tasks || []),
+            notes: payload.notes || '',
+            updated_before_9pm: isBefore9,
+            updated_at: new Date().toISOString()
+          }, currentUser.id);
+        }
+        result = { ok: true, data: { success: true } };
+        break;
+
+      case 'getAllStaffToDos':
+        requireRole(currentUser, ['MAIN_ADMIN', 'OPS_ADMIN', 'HR']);
+        var checkDate = payload.date || new Date().toISOString().substring(0, 10);
+        var staffUsers = getTableData('Users').filter(function(u) { return u.role !== 'STUDENT'; });
+        var dbTodos = getTableData('DailyToDos');
+        var reportsList = staffUsers.map(function(s) {
+          var found = null;
+          for (var c = 0; c < dbTodos.length; c++) {
+            if (dbTodos[c].user_id === s.id && dbTodos[c].date === checkDate) {
+              found = dbTodos[c];
+              break;
+            }
+          }
+          var taskArr = [];
+          try { taskArr = JSON.parse(found ? found.tasks_json : '[]'); } catch(e){}
+          var doneNum = taskArr.filter(function(tk){ return tk.status === 'DONE'; }).length;
+          return {
+            user_id: s.id,
+            full_name: s.full_name,
+            email: s.email,
+            role: s.role,
+            department: s.department,
+            has_submitted: !!found,
+            created_before_10am: found ? !!found.created_before_10am : false,
+            updated_before_9pm: found ? found.updated_before_9pm : null,
+            total_tasks: taskArr.length,
+            done_tasks: doneNum,
+            completion_pct: taskArr.length > 0 ? Math.round((doneNum / taskArr.length) * 100) : 0,
+            tasks: taskArr,
+            notes: found ? found.notes : ''
+          };
+        });
+        result = { ok: true, data: { date: checkDate, is_sunday: new Date(checkDate).getDay() === 0, staff_reports: reportsList } };
+        break;
+
+      case 'getSocialPosts':
+        var sps = getTableData('SocialPosts');
+        var sengs = getTableData('SocialEngagements');
+        var resPosts = sps.map(function(p) {
+          var isDone = false;
+          for (var k = 0; k < sengs.length; k++) {
+            if (sengs[k].post_id === p.id && sengs[k].user_id === currentUser.id) {
+              isDone = true;
+              break;
+            }
+          }
+          return {
+            id: p.id,
+            title: p.title,
+            post_url: p.post_url,
+            caption: p.caption,
+            created_by_name: p.created_by_name,
+            created_at: p.created_at,
+            is_done: isDone
+          };
+        });
+        result = { ok: true, data: { posts: resPosts.reverse() } };
+        break;
+
+      case 'createSocialPost':
+        requireRole(currentUser, ['MAIN_ADMIN', 'SOCIAL_MEDIA_MANAGER', 'MARKETING_HEAD']);
+        var newPost = insertRecord('SocialPosts', {
+          title: payload.title,
+          post_url: payload.post_url,
+          caption: payload.caption || '',
+          created_by_name: currentUser.full_name
+        }, currentUser.id);
+        result = { ok: true, data: newPost };
+        break;
+
+      case 'markSocialPostDone':
+        insertRecord('SocialEngagements', {
+          post_id: payload.post_id,
+          user_id: currentUser.id,
+          user_name: currentUser.full_name,
+          user_role: currentUser.role
+        }, currentUser.id);
+        result = { ok: true, data: { success: true } };
+        break;
+
+      case 'getSocialEngagementReport':
+        var allPosts = getTableData('SocialPosts');
+        var allEngs = getTableData('SocialEngagements');
+        var sList = getTableData('Users').filter(function(u) { return u.role !== 'STUDENT' && u.role !== 'MAIN_ADMIN'; });
+        var repList = allPosts.map(function(post) {
+          var pEngs = allEngs.filter(function(e) { return e.post_id === post.id; });
+          var engIds = {};
+          pEngs.forEach(function(e) { engIds[e.user_id] = true; });
+          var doneS = sList.filter(function(s) { return engIds[s.id]; });
+          var pendS = sList.filter(function(s) { return !engIds[s.id]; });
+          return {
+            post_id: post.id,
+            title: post.title,
+            post_url: post.post_url,
+            created_at: post.created_at,
+            total_required: sList.length,
+            done_count: doneS.length,
+            pending_count: pendS.length,
+            done_staff: doneS.map(function(s) { return { id: s.id, name: s.full_name, role: s.role, department: s.department }; }),
+            pending_staff: pendS.map(function(s) { return { id: s.id, name: s.full_name, role: s.role, department: s.department }; })
+          };
+        });
+        result = { ok: true, data: { reports: repList.reverse(), total_staff: sList.length } };
+        break;
+
       case 'getAuditLogs':
         requireRole(currentUser, ['MAIN_ADMIN']);
         var logs = getTableData('AuditLog');
